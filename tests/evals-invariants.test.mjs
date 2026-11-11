@@ -43,3 +43,44 @@ test('a malformed journal line names the file and line number', () => {
 test('result null is rejected', () => {
   assert.throws(() => loadFixture(tmpFixture({ result: null })), /result\.json: result\.json has no workflow result/)
 })
+
+import { checkBallots, checkTally, checkFlips } from '../evals/lib/checks.mjs'
+
+const fresh = () => structuredClone(loadFixture(FIRST))
+
+test('checks 1-3 pass on the first fixture', () => {
+  for (const check of [checkBallots, checkTally, checkFlips]) {
+    const r = check(fresh())
+    assert.equal(r.status, 'PASS', `${check.name}: ${r.detail}`)
+  }
+})
+
+test('checkBallots fails on a citation of a missing ID', () => {
+  const fx = fresh()
+  fx.run.ballots[0].reasons[0].cites = ['Z-C99']
+  const r = checkBallots(fx)
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, /Z-C99|no dossier ID/)
+})
+
+test('checkTally fails when the saved winner was tampered with', () => {
+  const fx = fresh()
+  fx.run.result.winner = 'Z'
+  const r = checkTally(fx)
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, /winner/)
+})
+
+test('checkFlips fails when a conceded count is off by one', () => {
+  const fx = fresh()
+  fx.run.dossier.flips[0].conceded += 1
+  const r = checkFlips(fx)
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, /conceded/)
+})
+
+test('checks 1-3 report n/a on a stopped run', () => {
+  const fx = fresh()
+  fx.run = { stopped: 'every option generator failed; resume the run to retry it' }
+  for (const check of [checkBallots, checkTally, checkFlips]) assert.equal(check(fx).status, 'n/a')
+})
