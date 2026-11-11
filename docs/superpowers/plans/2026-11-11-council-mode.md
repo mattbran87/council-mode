@@ -1573,7 +1573,7 @@ phase('Challenge')
 const round1 = await parallel(cases.map(c => () =>
   agent(challengePrompt(A.problem, c, cases.filter(k => k.label !== c.label), options), cleanOpts({
     label: `challenge:${c.label}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: A.advocateModel,
-  })).then(r => ({ from: c.label, challenges: r ? r.challenges : [] }))))
+  })).then(r => ({ from: c.label, challenges: (r && r.challenges) || [] }))))
 const { accepted, rejected } = collectChallenges(round1.filter(Boolean), claimIndex)
 if (rejected.length) log(`Referee rejected ${rejected.length} challenges before delivery.`)
 
@@ -1595,7 +1595,11 @@ const replyLists = await parallel(cases.map(c => () => {
     label: `reply:${c.label}`, phase: 'Reply', schema: REPLY_SCHEMA, model: A.advocateModel,
   }))
 }))
-const classified = classifyReplies(challenges, replyLists.filter(Boolean).flatMap(r => r.replies), claimIndex)
+// Each advocate's replies stay tagged with its label, so a stray ID cannot answer a rival's challenge.
+const replyRounds = cases.map((c, i) => ({ from: c.label, replies: (replyLists[i] && replyLists[i].replies) || [] }))
+const classified = classifyReplies(challenges, replyRounds, claimIndex)
+if (classified.stray.length) log(`${classified.stray.length} replies named a challenge that was not against their option; ignored.`)
+if (classified.duplicates.length) log(`${classified.duplicates.length} duplicate replies ignored; the first reply counts.`)
 
 // Blind rulings on every disputed claim.
 phase('Rule')
