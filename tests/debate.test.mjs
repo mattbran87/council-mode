@@ -59,11 +59,11 @@ test('classifyReplies sorts concessions, voided concessions, disputes, unanswere
   ]
   const out = classifyReplies(chs, [
     { from: 'M', replies: [
-      { challengeId: 'CH1', kind: 'concede', evidence: 'bench shows 90 ms', newConfidence: 20, reason: '' },
+      { challengeId: 'CH1', kind: 'concede', evidence: 'bench shows 90 ms', newConfidence: 20, dropReason: 'bench shows 90 ms', reason: '' },
       { challengeId: 'CH2', kind: 'concede', evidence: '', newConfidence: 60, reason: 'fine' },
     ] },
     { from: 'K', replies: [
-      { challengeId: 'CH3', kind: 'refute', evidence: '', newConfidence: 50, reason: 'disagree' },
+      { challengeId: 'CH3', kind: 'refute', evidence: '', newConfidence: 50, dropReason: '', reason: 'disagree' },
     ] },
   ], index)
   assert.deepEqual(out.concessions.map(x => [x.id, x.challenge.id]), [['X1', 'CH1']])
@@ -160,4 +160,20 @@ test('collectChallenges normalizes target IDs and tolerates missing challenges',
   ], index)
   assert.equal(accepted.length, 1)
   assert.equal(accepted[0].targetClaim, 'M-C1')
+})
+
+test('classifyReplies flags a confidence drop with an empty dropReason even when the reply has evidence', () => {
+  const chs = [{ id: 'CH1', targetClaim: 'K-C1', against: 'K' }]
+  const out = classifyReplies(chs, [{ from: 'K', replies: [
+    { challengeId: 'CH1', kind: 'refute', evidence: 'log shows ok', newConfidence: 50, dropReason: '  ', reason: 'r' },
+  ] }], index)
+  assert.deepEqual(out.drops, [{ claim: 'K-C1', from: 80, to: 50 }])
+})
+
+test('classifyReplies does not flag a drop that has a dropReason', () => {
+  const chs = [{ id: 'CH1', targetClaim: 'K-C1', against: 'K' }]
+  const out = classifyReplies(chs, [{ from: 'K', replies: [
+    { challengeId: 'CH1', kind: 'refute', evidence: '', newConfidence: 50, dropReason: 'the bench run', reason: 'r' },
+  ] }], index)
+  assert.deepEqual(out.drops, [])
 })

@@ -124,7 +124,7 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
     }
     const evidence = String(reply.evidence || '').trim()
     const claim = claimIndex[ch.targetClaim]
-    if (typeof reply.newConfidence === 'number' && reply.newConfidence < claim.confidence && !evidence) {
+    if (typeof reply.newConfidence === 'number' && reply.newConfidence < claim.confidence && !String(reply.dropReason || '').trim()) {
       out.drops.push({ claim: ch.targetClaim, from: claim.confidence, to: reply.newConfidence })
     }
     if (reply.kind === 'concede') {
@@ -420,9 +420,10 @@ const REPLY_SCHEMA = {
           kind: { type: 'string', enum: ['refute', 'concede', 'partial'] },
           evidence: { type: 'string' },
           newConfidence: { type: 'integer', minimum: 0, maximum: 100 },
+          dropReason: { type: 'string' },
           reason: { type: 'string' },
         },
-        required: ['challengeId', 'kind', 'evidence', 'newConfidence', 'reason'],
+        required: ['challengeId', 'kind', 'evidence', 'newConfidence', 'dropReason', 'reason'],
       },
     },
   },
@@ -511,7 +512,7 @@ function advocatePrompt(problem, option, budget) {
     'Problem statement (frozen):',
     problem,
     '',
-    `Option ${option.label}: ${option.description}`,
+    `Option ${option.label}: ${oneLine(option.description)}`,
     option.baseline ? 'This is the baseline option. Argue for it as seriously as any other option.' : '',
     '',
     `Research budget: ${budget}. Every advocate gets the same budget.`,
@@ -538,7 +539,7 @@ function challengePrompt(problem, own, rivals, options) {
     ...rivals.map(r => `${renderCase(r, describe(r.label))}\n`),
     'Rules:',
     '- Challenge at most 2 claims of each rival, by claim ID (for example M-C2).',
-    '- Every challenge must cite evidence: a test result, a source, or a claim ID from any case. A challenge without evidence is rejected.',
+    '- Every challenge must state its evidence in full: a test result, a source with its link, or a quoted fact. A bare claim ID is not evidence, and do not name your own option. A challenge without evidence is rejected.',
     '- State each challenge plainly. Do not use words such as "clearly" or "obviously".',
     '- If no rival claim is weak, return an empty list.',
   ].join('\n')
@@ -548,6 +549,7 @@ function refereeFilterPrompt(challenges) {
   return [
     'You are a neutral referee. Rewrite each debate challenge below into neutral form.',
     'Keep the exact factual content. Delete confidence and tone words such as "clearly", "obviously", and "any expert knows", and any appeal to authority.',
+    'Remove any reference to which option wrote the challenge, such as "our option" or the challenger\'s own claim IDs.',
     'Return every challenge by its ID. Do not add, drop, or merge challenges. Do not rewrite the evidence.',
     '',
     ...challenges.map(c => `${c.id} (against ${c.targetClaim}): ${oneLine(c.text)} | Evidence: ${oneLine(c.evidence)}`),
@@ -570,7 +572,7 @@ function replyPrompt(problem, own, against, description) {
     '- Reply to every challenge by its ID. A challenge with no reply is shown to the voters as unanswered.',
     '- kind: refute (give the evidence that defeats the challenge), concede (give the evidence that defeats your own claim), or partial (give the evidence for the part that stands).',
     '- Concede only for evidence. Confident wording is not evidence. A concession without evidence is voided.',
-    '- newConfidence: your confidence in the challenged claim now. If it drops, the evidence field must name what caused the drop.',
+    '- newConfidence: your confidence in the challenged claim now. dropReason: if newConfidence is lower than before, the evidence that caused the drop; otherwise an empty string.',
   ].join('\n')
 }
 
