@@ -1789,14 +1789,16 @@ Find this skill's base directory in the "Base directory for this skill" line sho
 | `personas` | Array of 7 `{ "name", "criteria", "model" }`; `criteria` is the full criteria sheet text |
 | `budget` | The research budget text |
 | `advocateModel` | The advocate model, or leave it out to use the session model |
-| `refereeModel` | The referee model; it must differ from the advocate model |
+| `refereeModel` | Required. The referee model; it must differ from `advocateModel`. If you leave `advocateModel` out, pick a referee model that differs from the session model |
 | `seed` | Any integer, such as today's date as YYYYMMDD plus the current minute; it drives labels and voter order |
 | `isolateAdvocates` | `true` only under the condition in step 1 |
 | `thresholds` | Leave it out to use the default `{ "sycophancy": 0.75 }` |
 | `options` | Leave it out, except for a hybrid round (below) |
 | `baseline` | Leave it out, except for a hybrid round (below) |
 
-If the result has a `stopped` field, report the reason to the user and stop. If the reason is a failed advocate, offer to resume the run with `resumeFromRunId`.
+If the Workflow call throws, the arguments are invalid (missing `problem`, not exactly 7 personas, missing `refereeModel`, equal referee and advocate models, or duplicate persona names). Fix the arguments and start again.
+
+If the result has a `stopped` field, report the reason to the user and stop. If the reason ends with "resume the run to retry it", an agent failed: offer to resume the run with `resumeFromRunId`, which replays the finished agents from cache. If every ballot was discarded, show the discarded ballots and their problems.
 
 ## Step 8: Report
 
@@ -1807,7 +1809,7 @@ Write the report in this order. Use the option labels throughout and give each o
 3. **Persona × option matrix**: each persona's ranking.
 4. **Most-cited evidence**: the top entries of `result.citations`, with the cited text from the dossier.
 5. **Shared flip conditions**: group the ballots' `flipCondition` values by meaning, and list each group that 2 or more voters named. These are the next things to test.
-6. **Debate record**: rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, and every flip warning (`sycophancy` or `stubbornness`).
+6. **Debate record**: rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, every flip warning (`sycophancy` or `stubbornness`), and every entry in `result.warnings` (such as challenges the referee did not rewrite, or stray and duplicate replies).
 7. **Discarded ballots** and the problems for each.
 8. **Hybrid candidates**: group the ballots' `hybrid` values by meaning, and list each group that 2 or more voters proposed.
 
@@ -1868,7 +1870,7 @@ test('the doc names every workflow phase', () => {
 })
 
 test('the doc names every field of the workflow result', () => {
-  for (const field of ['options', 'dossier', 'rejectedChallenges', 'result', 'citations', 'ballots', 'discarded', 'stopped']) {
+  for (const field of ['options', 'dossier', 'rejectedChallenges', 'result', 'citations', 'ballots', 'discarded', 'warnings', 'stopped']) {
     assert.ok(doc.includes(`\`${field}\``), field)
   }
 })
@@ -2026,7 +2028,7 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 | `personas` | yes | Exactly 7 `{ name, criteria, model }` |
 | `budget` | no | Research budget text; default "at most 20 tool calls" |
 | `advocateModel` | no | Model for advocates; default is the session model |
-| `refereeModel` | no | Model for the referee; must differ from `advocateModel` |
+| `refereeModel` | yes | Model for the referee; the script throws if it equals `advocateModel` |
 | `seed` | no | Integer for labels and voter order; default 1 |
 | `isolateAdvocates` | no | `true` runs research agents in git worktrees |
 | `thresholds` | no | `{ sycophancy }`; default 0.75 |
@@ -2036,7 +2038,8 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 
 | Field | Holds |
 | --- | --- |
-| `stopped` | Present only when the run stops early: fewer than 3 options, or a failed advocate |
+| `stopped` | Present only when the run stops early: fewer than 3 options, too many options, every ballot discarded, or a failed agent (generator, merge, advocate, challenge, referee filter, reply, or ruling). A failed-agent reason ends with "resume the run to retry it" |
+| `warnings` | Problems that did not stop the run: challenges the referee did not rewrite, and stray or duplicate replies |
 | `options` | Labeled options, with the `baseline` flag |
 | `dossier` | Everything voters saw: claims with status, rulings, concessions, voided concessions, unanswered challenges, confidence drops, flip counts |
 | `rejectedChallenges` | Challenges stopped before delivery, with the reason |
@@ -2060,7 +2063,8 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 | Simultaneous rounds | `parallel()` with one call per advocate per round |
 | Blind referee | `rulingPrompt` shows no claim ID or option label |
 | Neutral labels, shuffled order | `assignLabels`, `shuffle` with `seed` (code) |
-| Reasons must cite evidence | `validateBallot` (code) |
+| Reasons must cite evidence | `normalizeBallot` cleans labels and IDs, then `validateBallot` checks them (code) |
+| A failed agent never skews the dossier | The run stops with "resume the run to retry it" (code) |
 | Condorcet, then Borda, then tie | `tally` (code) |
 ````
 
