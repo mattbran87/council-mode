@@ -625,9 +625,12 @@ if (A.options) {
 } else {
   phase('Generate')
   const generated = (await parallel([1, 2, 3].map(n => () =>
-    agent(generatorPrompt(A.problem, n), { label: `generate:${n}`, phase: 'Generate', schema: GENERATOR_SCHEMA })))).filter(Boolean)
+    agent(generatorPrompt(A.problem, n), { label: `generate:${n}`, phase: 'Generate', schema: GENERATOR_SCHEMA }))))
+    .filter(g => g && Array.isArray(g.options))
+  if (!generated.length) return { stopped: 'every option generator failed; resume the run to retry it' }
   described = await agent(mergePrompt(A.problem, generated.flatMap(g => g.options)),
     { label: 'merge', phase: 'Generate', schema: MERGE_SCHEMA })
+  if (!described || !Array.isArray(described.options)) return { stopped: 'the merge agent failed; resume the run to retry it' }
 }
 const options = assignLabels([
   ...described.options.map(o => ({ description: o.description, baseline: false })),

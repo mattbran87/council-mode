@@ -117,6 +117,20 @@ test('fewer than 3 merged options stops the run before research', async () => {
   assert.ok(!calls.some(c => c.opts.label.startsWith('advocate')))
 })
 
+test('a failed merge stops the run before research', async () => {
+  const respond = fakeCouncil({ merge: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'the merge agent failed; resume the run to retry it')
+  assert.ok(!calls.some(c => c.opts.label.startsWith('advocate')))
+})
+
+test('every generator failing stops the run before the merge', async () => {
+  const respond = fakeCouncil({ generate: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'every option generator failed; resume the run to retry it')
+  assert.ok(!calls.some(c => c.opts.label === 'merge'))
+})
+
 test('a failed advocate stops the run', async () => {
   const respond = fakeCouncil({ advocate: () => null })
   const { result } = await runWorkflow({ args: ARGS, respond })
