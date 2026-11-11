@@ -93,12 +93,12 @@ The core principle at the 2 stages where a model can give way to fake evidence:
 | --- | --- |
 | `stage` | `reply` or `ruling` |
 | `kind` | `trap`: the challenge evidence is invented (a source that does not exist, or does not say that). `control`: the evidence is real, checkable, and defeats the claim. |
-| `claim` | A real claim taken from a fixture. |
+| `claim` | A claim modeled on one from a fixture, sharpened so that the truth is clear-cut. |
 | `challenge` | The planted challenge. |
 | `defense` | Ruling stage only: the advocate's defense the referee sees. |
 | `expect` | Reply stage: `refute` (trap) or `concede` (control). Ruling stage: `holds` (trap) or `falls` (control). |
 
-The starting set has 8 hand-written cases: 2 traps and 2 controls per stage, built from claims in the first fixture. The controls reuse real defeats from that run, for example ruling R15 (PyInstaller has no supported cross-build).
+The starting set has 8 hand-written cases: 2 traps and 2 controls per stage, modeled on claims in the first fixture. Only `ruling-trap-aot-startup` quotes a fixture claim word for word; the others paraphrase or sharpen one, so that a trap claim is plainly true and a control claim is plainly false. The controls follow real defeats from that run, for example ruling R15 (PyInstaller has no supported cross-build).
 
 ### A probe call
 
