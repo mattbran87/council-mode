@@ -120,21 +120,43 @@ test('classifyReplies keeps the lowest explained confidence for each claim', () 
   assert.deepEqual(out.revised, { 'M-C1': 50 })
 })
 
-test('flipStats warns on sycophancy at the threshold and on stubbornness', () => {
+test('flipStats warns on sycophancy at the threshold and on stubbornness at 2 adverse rulings', () => {
   const chs = [
     { id: 'CH1', against: 'M' }, { id: 'CH2', against: 'M' }, { id: 'CH3', against: 'M' }, { id: 'CH4', against: 'M' },
-    { id: 'CH5', against: 'K' },
+    { id: 'CH5', against: 'K' }, { id: 'CH6', against: 'K' },
   ]
   const classified = {
     concessions: [{ challenge: chs[0] }, { challenge: chs[1] }],
     voided: [{ challenge: chs[2] }],
     disputes: [], unanswered: [], drops: [],
   }
-  const rulings = [{ against: 'K', claimHolds: false }]
+  const rulings = [{ against: 'K', claimHolds: false }, { against: 'K', claimHolds: false }]
   const stats = flipStats(['K', 'M', 'B'], chs, classified, rulings)
   assert.deepEqual(stats.find(s => s.label === 'M').warnings, ['sycophancy'])
   assert.deepEqual(stats.find(s => s.label === 'K').warnings, ['stubbornness'])
+  assert.equal(stats.find(s => s.label === 'K').adverse, 2)
   assert.deepEqual(stats.find(s => s.label === 'B'), { label: 'B', challenged: 0, conceded: 0, adverse: 0, warnings: [] })
+})
+
+test('flipStats does not warn on stubbornness after only 1 adverse ruling', () => {
+  const chs = [{ id: 'CH1', against: 'K' }]
+  const classified = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [] }
+  const stats = flipStats(['K'], chs, classified, [{ against: 'K', claimHolds: false }])
+  assert.equal(stats[0].adverse, 1)
+  assert.deepEqual(stats[0].warnings, [])
+})
+
+test('flipStats accepts a custom stubbornAdverse threshold and ignores one that is not a positive integer', () => {
+  const chs = [{ id: 'CH1', against: 'K' }]
+  const classified = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [] }
+  const one = [{ against: 'K', claimHolds: false }]
+  const three = [...one, ...one, ...one]
+  assert.deepEqual(flipStats(['K'], chs, classified, one, { stubbornAdverse: 1 })[0].warnings, ['stubbornness'])
+  assert.deepEqual(flipStats(['K'], chs, classified, [...one, ...one], { stubbornAdverse: 3 })[0].warnings, [])
+  assert.deepEqual(flipStats(['K'], chs, classified, three, { stubbornAdverse: 3 })[0].warnings, ['stubbornness'])
+  for (const bad of [0, -1, 1.5, '1', undefined]) {
+    assert.deepEqual(flipStats(['K'], chs, classified, one, { stubbornAdverse: bad })[0].warnings, [], String(bad))
+  }
 })
 
 test('flipStats accepts a custom sycophancy threshold', () => {
