@@ -1632,9 +1632,11 @@ const valid = []
 const discarded = []
 ballots.forEach((b, i) => {
   if (!b) { discarded.push({ persona: personas[i].name, problems: ['the voter agent failed'] }); return }
-  const check = validateBallot(b, labels, ids)
-  if (check.valid) valid.push(b)
-  else discarded.push({ persona: b.persona, problems: check.problems })
+  // Normalize "Option K", "k", "k-c1" first, so a format slip does not void a ballot that cites evidence.
+  const nb = normalizeBallot(b, labels, ids)
+  const check = validateBallot(nb, labels, ids)
+  if (check.valid) valid.push(nb)
+  else discarded.push({ persona: nb.persona, problems: check.problems })
 })
 if (discarded.length) log(`${discarded.length} ballots discarded.`)
 
