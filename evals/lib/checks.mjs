@@ -42,8 +42,11 @@ export function checkFlips(fx) {
   const challenges = d.flips.flatMap(f => Array.from({ length: f.challenged }, () => ({ against: f.label })))
   const recomputed = H.flipStats(labelsOf(fx.run), challenges, { concessions: d.concessions, voided: d.voided }, d.rulings, fx.meta.thresholds)
   const bad = []
+  const savedLabels = new Set(d.flips.map(f => f.label))
+  for (const r of recomputed) if (!savedLabels.has(r.label)) bad.push(`Option ${r.label}: missing from saved flips`)
   for (const saved of d.flips) {
     const r = recomputed.find(x => x.label === saved.label)
+    if (!r) { bad.push(`Option ${saved.label}: in saved flips but not an option`); continue }
     for (const k of ['conceded', 'adverse']) {
       if (r[k] !== saved[k]) bad.push(`Option ${saved.label} ${k}: saved ${saved[k]}, recomputed ${r[k]}`)
     }

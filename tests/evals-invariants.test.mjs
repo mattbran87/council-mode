@@ -84,3 +84,12 @@ test('checks 1-3 report n/a on a stopped run', () => {
   fx.run = { stopped: 'every option generator failed; resume the run to retry it' }
   for (const check of [checkBallots, checkTally, checkFlips]) assert.equal(check(fx).status, 'n/a')
 })
+
+test('checkFlips names an option whose flip entry is missing', () => {
+  const fx = fresh()
+  const label = fx.run.dossier.flips[0].label
+  fx.run.dossier.flips.splice(0, 1)
+  const r = checkFlips(fx)
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, new RegExp(`Option ${label}: missing from saved flips`))
+})
