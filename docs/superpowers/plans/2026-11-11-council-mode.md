@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-11-council-mode-design.md`
 
+> **Note added during execution (2026-11-11):** code review changed the helpers from Tasks 3–7 after they were built: tagged reply rounds with `stray`/`duplicates`, `oneLine` sanitizing, per-voter ordering of dossier sections, a confidence-drops section, `normalizeBallot`, adjacent-pair citation counts, self-contained challenge evidence, and a required `dropReason`. For those tasks the code in the repo is the source of truth, and the code blocks below show the original version. Task 8 onward match the current code.
+
 ---
 
 ## Constraints every task must respect
