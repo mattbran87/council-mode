@@ -56,8 +56,8 @@ Find this skill's base directory in the "Base directory for this skill" line sho
 | `seed` | Any integer, such as today's date as YYYYMMDD plus the current minute; it drives labels and voter order |
 | `isolateAdvocates` | `true` only under the condition in step 1 |
 | `thresholds` | Leave it out to use the default `{ "sycophancy": 0.75 }` |
-| `options` | Leave it out, except for a hybrid round (below) |
-| `baseline` | Leave it out, except for a hybrid round (below) |
+| `options` | Leave it out, unless the user chose fixed options in the fit check, or this is a hybrid round (below). Strings or `{ "description" }` objects. |
+| `baseline` | Leave it out to use "Change nothing."; give the original baseline description for a hybrid round. |
 
 If the Workflow call throws, the arguments are invalid (missing `problem`, not exactly 7 personas, missing `refereeModel`, equal referee and advocate models, duplicate persona names, or a fixed option or baseline without a description). Fix the arguments and start again.
 
