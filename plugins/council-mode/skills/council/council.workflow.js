@@ -378,7 +378,7 @@ const GENERATOR_SCHEMA = {
 
 const MERGE_SCHEMA = {
   type: 'object',
-  properties: { options: { type: 'array', items: DESCRIPTION_ITEM }, baseline: { type: 'string' } },
+  properties: { options: { type: 'array', items: DESCRIPTION_ITEM }, baseline: { type: 'string', minLength: 1 } },
   required: ['options', 'baseline'],
 }
 
@@ -671,7 +671,7 @@ if (A.options) {
     { label: 'merge', phase: 'Generate', schema: MERGE_SCHEMA })
   if (!described || !Array.isArray(described.options)) return { stopped: 'the merge agent failed; resume the run to retry it' }
   const mergedBaseline = String(describeOf(described.baseline) ?? '').trim()
-  if (!mergedBaseline) return { stopped: 'the merge agent returned no baseline; resume the run to retry it' }
+  if (!mergedBaseline) return { stopped: 'the merge agent returned no baseline; start the run again with a new seed' }
   described = {
     options: described.options.map(describeOf).filter(d => String(d ?? '').trim()),
     baseline: mergedBaseline,

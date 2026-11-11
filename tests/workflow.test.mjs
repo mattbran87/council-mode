@@ -221,7 +221,7 @@ test('a merge without a baseline stops the run', async () => {
     merge: () => ({ options: [{ description: 'alpha approach' }, { description: 'beta approach' }, { description: 'gamma approach' }], baseline: ' ' }),
   })
   const { result, calls } = await runWorkflow({ args: ARGS, respond })
-  assert.equal(result.stopped, 'the merge agent returned no baseline; resume the run to retry it')
+  assert.equal(result.stopped, 'the merge agent returned no baseline; start the run again with a new seed')
   assert.ok(!calls.some(c => c.opts.label.startsWith('advocate')))
 })
 
