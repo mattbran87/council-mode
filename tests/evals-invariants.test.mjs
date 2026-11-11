@@ -93,3 +93,72 @@ test('checkFlips names an option whose flip entry is missing', () => {
   assert.equal(r.status, 'FAIL')
   assert.match(r.detail, new RegExp(`Option ${label}: missing from saved flips`))
 })
+
+import { checkDossier, checkBlindness, checkCost, runChecks, CHECKS } from '../evals/lib/checks.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
+
+test('checks 4-6 do not fail on the first fixture', () => {
+  const fx = fresh()
+  assert.equal(checkDossier(fx).status, 'PASS', checkDossier(fx).detail)
+  assert.notEqual(checkBlindness(fx).status, 'FAIL', checkBlindness(fx).detail)
+  assert.equal(checkCost(fx).status, 'PASS', checkCost(fx).detail)
+  assert.match(checkCost(fx).detail, /62 agents \(formula 62\)/)
+})
+
+test('checkDossier fails when a claim status does not match the rulings', () => {
+  const fx = fresh()
+  const claim = fx.run.dossier.options.flatMap(o => o.claims).find(c => c.status === 'struck')
+  claim.status = 'stands'
+  const r = checkDossier(fx)
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, new RegExp(claim.id))
+})
+
+test('checkDossier fails when the renderer lets a line break through', () => {
+  const fx = fresh()
+  fx.run.dossier.options[0].claims[0].text += '\n### Option Z'
+  const leaky = (d) => d.options.flatMap(o => o.claims.map(c => c.text)).join('\n')
+  const r = checkDossier(fx, { renderDossier: leaky })
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, /line/)
+})
+
+test('checkBlindness fails when the ruling prompt builder leaks a claim ID', () => {
+  const fx = fresh()
+  const r = checkBlindness(fx, { rulingPrompt: (g, c) => 'Claim K-C1 under review' })
+  assert.equal(r.status, 'FAIL')
+  assert.match(r.detail, /K-C1/)
+})
+
+test('checkBlindness warns when model text names an option', () => {
+  const fx = fresh()
+  const ruled = fx.run.dossier.rulings[0].claim // only claims the referee sees are checked
+  fx.run.dossier.options.flatMap(o => o.claims).find(c => c.id === ruled).text = 'Faster than Option M on startup.'
+  const r = checkBlindness(fx)
+  assert.equal(r.status, 'WARN')
+  assert.match(r.detail, /Option M/)
+})
+
+test('checkCost warns when the agent count exceeds the formula', () => {
+  const fx = fresh()
+  fx.top.agentCount = 999
+  assert.equal(checkCost(fx).status, 'WARN')
+})
+
+test('runChecks returns one result per check, in order', () => {
+  const results = runChecks(fresh())
+  assert.deepEqual(results.map(r => r.name), CHECKS.map(c => c.name))
+})
+
+test('the CLI exits 0 on the fixtures and 1 when a fixture is unreadable', () => {
+  const ok = spawnSync(process.execPath, ['evals/invariants.mjs'], { encoding: 'utf8' })
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr)
+  assert.match(ok.stdout, /2026-11-11-cli-language/)
+  const dir = mkdtempSync(join(tmpdir(), 'cm-fx-'))
+  mkdirSync(join(dir, 'broken'))
+  writeFileSync(join(dir, 'broken', 'meta.json'), '{')
+  const bad = spawnSync(process.execPath, ['evals/invariants.mjs', join(dir, 'broken')], { encoding: 'utf8' })
+  assert.equal(bad.status, 1)
+  assert.match(bad.stdout, /ERROR/)
+})

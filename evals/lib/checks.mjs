@@ -56,3 +56,83 @@ export function checkFlips(fx) {
   }
   return bad.length ? fail(bad) : pass(`${d.flips.length} options consistent`)
 }
+
+// Check 4. `h` lets tests inject a faulty renderer.
+export function checkDossier(fx, h = H) {
+  const d = fx.run.dossier
+  if (!d) return na('stopped run')
+  const bad = []
+  const falseClaims = new Set(d.rulings.filter(r => !r.claimHolds).map(r => r.claim))
+  const conceded = new Set(d.concessions.map(x => x.challenge.targetClaim))
+  for (const o of d.options) {
+    for (const c of o.claims) {
+      const want = falseClaims.has(c.id) ? 'struck' : conceded.has(c.id) ? 'conceded' : 'stands'
+      if (c.status !== want) bad.push(`${c.id}: status ${c.status}, expected ${want}`)
+    }
+  }
+  // A copy with every model-written string flattened must render to the same number of lines.
+  const flat = JSON.parse(JSON.stringify(d), (k, v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ') : v))
+  flat.problem = d.problem // the user writes the problem; it may span lines
+  const order = labelsOf(fx.run)
+  const real = h.renderDossier(d, order).split('\n').length
+  const flattened = h.renderDossier(flat, order).split('\n').length
+  if (real !== flattened) bad.push(`rendered dossier has ${real} lines, ${real - flattened} more than with model text flattened`)
+  return bad.length ? fail(bad) : pass(`${d.options.flatMap(o => o.claims).length} claim statuses consistent; no forged lines`)
+}
+
+const CLAIM_ID = /\b[A-Z]-[CW]\d+\b/
+const OPTION_MENTION = /\bOption [A-Z]\b/
+
+// Check 5. `h` lets tests inject a leaky builder.
+export function checkBlindness(fx, h = H) {
+  const d = fx.run.dossier
+  if (!d) return na('stopped run')
+  const claims = new Map(d.options.flatMap(o => o.claims.map(c => [c.id, c])))
+  const fails = []
+  const hints = []
+  const placeholder = { challenge: { text: 'placeholder challenge', evidence: 'placeholder evidence' }, reply: { kind: 'refute', reason: 'placeholder defense', evidence: 'placeholder evidence' } }
+  for (const r of d.rulings) {
+    const claim = claims.get(r.claim)
+    if (!claim) { fails.push(`${r.id}: claim ${r.claim} is not in the dossier`); continue }
+    const prompt = h.rulingPrompt({ items: [placeholder] }, claim)
+    const leak = prompt.match(CLAIM_ID)
+    if (leak) fails.push(`${r.id}: ruling prompt contains claim ID ${leak[0]}`)
+    if (new RegExp(`\\b${r.id}\\b`).test(prompt)) fails.push(`${r.id}: ruling prompt contains its ruling ID`)
+    const mention = `${claim.text} ${claim.source || ''}`.match(OPTION_MENTION)
+    if (mention) hints.push(`${r.claim} text names ${mention[0]}`)
+  }
+  for (const x of [...d.concessions, ...d.unanswered]) {
+    const mention = `${x.challenge.text} ${x.challenge.evidence}`.match(OPTION_MENTION)
+    if (mention) hints.push(`challenge against ${x.challenge.targetClaim} names ${mention[0]}`)
+  }
+  if (fails.length) return fail(fails)
+  if (hints.length) return warn(`model text names options: ${hints.join('; ')}`)
+  return pass(`${d.rulings.length} ruling prompts blind`)
+}
+
+// Check 6.
+export function checkCost(fx) {
+  const run = fx.run
+  if (run.stopped || !run.dossier) return na('stopped run')
+  const N = run.options.length
+  const R = run.dossier.rulings.length
+  const expected = (fx.meta.fixedOptions ? 8 : 12) + 3 * N + R
+  const got = fx.top.agentCount
+  const detail = `${got} agents (formula ${expected}), ${fx.top.totalTokens} tokens`
+  return got > expected ? warn(detail) : pass(detail)
+}
+
+export const CHECKS = [
+  { name: 'ballots', fn: checkBallots },
+  { name: 'tally', fn: checkTally },
+  { name: 'flips', fn: checkFlips },
+  { name: 'dossier', fn: checkDossier },
+  { name: 'blindness', fn: checkBlindness },
+  { name: 'cost', fn: checkCost },
+]
+
+export function runChecks(fx) {
+  return CHECKS.map(({ name, fn }) => {
+    try { return { name, ...fn(fx) } } catch (e) { return { name, status: 'ERROR', detail: e.message } }
+  })
+}
