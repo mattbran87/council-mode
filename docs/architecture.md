@@ -52,17 +52,17 @@ sequenceDiagram
   U->>S: approve (frame is now locked)
   S->>W: Workflow(scriptPath, args)
   Note over W: code checks the args and throws if they are bad
-  Note over W: Generate
+  Note over W: Generate, skipped when args hold fixed options
   W->>G: 3 generators in parallel, then merge
   G-->>W: options + baseline
-  Note over W: code stops if fewer than 3 options
+  Note over W: code stops if fewer than 3 options or too many options
   Note over W: Research
   W->>A: 1 advocate per option, in parallel
   A-->>W: cases (claims, weaknesses, failed tests)
   Note over W: Challenge
   W->>A: round 1, all at once
   A-->>W: challenges
-  Note over W: code rejects challenges with no evidence
+  Note over W: code rejects challenges with no evidence, unknown or own claims, or over 2 per rival
   Note over W: Referee
   W->>R: strip the tone
   R-->>W: neutral challenge text
@@ -70,7 +70,7 @@ sequenceDiagram
   W->>A: round 2, all at once
   A-->>W: refute / concede / partial, tagged by advocate
   Note over W: Rule
-  W->>R: 1 blind ruling per disputed claim
+  W->>R: 1 blind ruling per disputed challenge
   R-->>W: claim holds or not
   Note over W: code builds the dossier
   Note over W: Vote
@@ -81,7 +81,7 @@ sequenceDiagram
   S->>U: report, and the user decides
 ```
 
-If any agent in Generate through Rule fails, the run stops and returns a `stopped` reason. The skill then offers to resume the run.
+If one generator fails, code drops its options and the run goes on. The run stops and returns a `stopped` reason when all 3 generators fail, when the merge fails, or when any agent from Research through Rule fails. The skill then offers to resume the run.
 
 ## How data flows
 
@@ -103,6 +103,8 @@ flowchart TD
   cls -->|referee, blind| rul[rulings R1]
   cls --> flips
   rul -->|code: flip counts| flips[flips<br/>sycophancy / stubbornness]
+  args -->|problem| dos
+  labeled --> dos
   cases --> dos
   cls --> dos
   rul --> dos
@@ -117,6 +119,8 @@ flowchart TD
   valid -->|code: adjacent-pair reasons| cit[citations]
   res --> out[workflow result]
   cit --> out
+  valid -->|ballots| out
+  labeled -->|options| out
   disc --> out
   dos --> out
   rej --> out
@@ -144,7 +148,7 @@ Every item a voter can cite has an ID. Option labels are random letters that avo
 | `K-W1` | Weakness 1 of Option K | `numberCase` |
 | `CH1` | Accepted challenge 1 | `collectChallenges` |
 | `X1` | Concession with evidence | `classifyReplies` |
-| `R1` | Disputed claim and its ruling | `classifyReplies`, then the referee |
+| `R1` | Disputed challenge and its ruling; 2 rivals can dispute the same claim, and each dispute gets its own ID | `classifyReplies`, then the referee |
 | `U1` | Unanswered challenge | `classifyReplies` |
 
 A ballot reason must cite at least one claim, weakness, ruling, concession, or unanswered ID. A bare option label does not count. `CH1` IDs are internal: voters cannot cite them.
@@ -157,11 +161,11 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 | `personas` | yes | Exactly 7 `{ name, criteria, model }`, with different names |
 | `budget` | no | Research budget text; default "at most 20 tool calls" |
 | `advocateModel` | no | Model for advocates; default is the session model |
-| `refereeModel` | yes | Model for the referee; must differ from `advocateModel` |
+| `refereeModel` | yes | Model for the referee. The script compares it with `advocateModel` only when `advocateModel` is given. If `advocateModel` is left out, the skill must pick a referee model that differs from the session model |
 | `seed` | no | Integer for labels and voter order; default 1 |
 | `isolateAdvocates` | no | `true` runs research agents in git worktrees |
 | `thresholds` | no | `{ sycophancy }`; default 0.75 |
-| `options`, `baseline` | no | Fixed options that skip Generate, for a hybrid round. Each is a string or `{ description }`. The default baseline is "Change nothing." |
+| `options`, `baseline` | no | Fixed options that skip Generate, for a hybrid round. Each is a string or `{ description }`. The script reads `baseline` only together with `options`, and ignores it otherwise. The default baseline is "Change nothing." |
 
 The script throws, before it starts any agent, if `problem` is missing, there are not exactly 7 personas, `refereeModel` is missing, `refereeModel` equals `advocateModel`, 2 personas have the same name, or a fixed option or baseline has no description.
 
@@ -169,10 +173,10 @@ The script throws, before it starts any agent, if `problem` is missing, there ar
 
 | Field | Holds |
 | --- | --- |
-| `stopped` | Present only when the run stops early. The reasons are: fewer than 3 options, too many options, every ballot discarded, or a failed agent. A failed agent means all 3 generators, the merge, an advocate, a challenge agent, the referee filter, a reply agent, or a ruling. A failed-agent reason ends with "resume the run to retry it". A stopped result also holds the fields that exist at that point, such as `options` |
+| `stopped` | Present only when the run stops early. The reasons are: fewer than 3 options, too many options, every ballot discarded, or a failed agent. A failed agent means all 3 generators, the merge, an advocate, a challenge agent, the referee filter, a reply agent, or a ruling. A failed-agent reason ends with "resume the run to retry it". The other fields depend on the stop: a generator, merge, or too-many-options stop returns only `stopped`. A fewer-than-3-options stop and a failed advocate, challenge agent, referee filter, reply agent, or ruling return `stopped` and `options`. An every-ballot-discarded stop returns `stopped`, `options`, `dossier`, `rejectedChallenges`, `discarded`, and `warnings` |
 | `warnings` | Problems that did not stop the run: challenges the referee did not rewrite, and stray or duplicate replies |
 | `options` | Labeled options, with the `baseline` flag |
-| `dossier` | Everything voters saw: the problem, claims with status, rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, flip counts |
+| `dossier` | Everything voters saw: the problem, claims with status, weaknesses, failed tests, rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, flip counts |
 | `rejectedChallenges` | Challenges stopped before delivery, with the reason: unknown claim, own claim, no evidence, or over limit |
 | `result` | `method` (condorcet, borda, tie), `winner`, `tied`, `pairwise`, `borda`, `fragile`, `unacceptableVotes`, `voters` |
 | `citations` | Dossier IDs with the number of voters who cited each, most cited first |
