@@ -55,8 +55,8 @@ Find this skill's base directory in the "Base directory for this skill" line sho
 | `refereeModel` | Required. The referee model; it must differ from `advocateModel`. If you leave `advocateModel` out, pick a referee model that differs from the session model |
 | `seed` | Any integer, such as today's date as YYYYMMDD plus the current minute; it drives labels and voter order |
 | `isolateAdvocates` | `true` only under the condition in step 1 |
-| `thresholds` | Leave it out to use the default `{ "sycophancy": 0.75 }` |
-| `options` | Leave it out, unless the user chose fixed options in the fit check, or this is a hybrid round (below). Strings or `{ "description" }` objects. |
+| `thresholds` | Leave it out to use the default `{ "sycophancy": 0.75, "stubbornAdverse": 2 }` |
+| `options` | Leave it out, unless the user chose fixed options in the fit check, or this is a hybrid round (below). Strings or `{ "description" }` objects. The script keeps at most 5. |
 | `baseline` | Leave it out to use "Change nothing."; give the original baseline description for a hybrid round. |
 
 If the Workflow call throws, the arguments are invalid (missing `problem`, not exactly 7 personas, missing `refereeModel`, equal referee and advocate models, duplicate persona names, or a fixed option or baseline without a description). Fix the arguments and start again.
@@ -72,7 +72,7 @@ Write the report in this order. Use the option labels throughout and give each o
 3. **Persona × option matrix**: from `result.ballots[].ranking`; list each discarded persona as discarded.
 4. **Most-cited evidence**: the top entries of `result.citations`, each with its `voters` count and the cited text: claims and weaknesses in `dossier.options[]`, rulings in `dossier.rulings`, concessions in `dossier.concessions`, unanswered challenges in `dossier.unanswered`.
 5. **Shared flip conditions**: group the ballots' `flipCondition` values by meaning, and list each group that 2 or more voters named. These are the next things to test.
-6. **Debate record**: `dossier.rulings`, `dossier.concessions`, `dossier.voided`, `dossier.unanswered`, `dossier.drops`, `dossier.flips[]` (every warning, `sycophancy` or `stubbornness`, with the challenged, conceded, and adverse counts), `rejectedChallenges`, and every entry in `result.warnings` (such as challenges the referee did not rewrite, or stray and duplicate replies).
+6. **Debate record**: `dossier.rulings`, `dossier.concessions`, `dossier.voided`, `dossier.unanswered`, `dossier.drops`, `dossier.flips[]` (every warning, `sycophancy` or `stubbornness`, with the challenged, conceded, and adverse counts), `rejectedChallenges`, and every entry in `result.warnings` (such as options cut to the first 5, challenges the referee did not rewrite, or stray and duplicate replies).
 7. **Discarded ballots** and the problems for each.
 8. **Hybrid candidates**: group the ballots' `hybrid` values by meaning, and list each group that 2 or more voters proposed.
 
@@ -80,6 +80,6 @@ If the margin is narrow — a Borda result, or a pairwise win by 1 vote (check `
 
 ## After the report
 
-- **Hybrid round.** If a hybrid candidate exists, ask the user whether to run a second round. If yes, start the workflow again with the same frozen frame, a new `seed`, `options` set to the original non-baseline option descriptions plus the hybrid, and `baseline` set to the original baseline description.
+- **Hybrid round.** If a hybrid candidate exists, ask the user whether to run a second round. If yes, start the workflow again with the same frozen frame, a new `seed`, `options` set to the hybrid first, then the original non-baseline option descriptions (the script keeps only the first 5 options, so with 5 originals drop the one the panel ranked lowest), and `baseline` set to the original baseline description.
 - **Wrong frame.** If the debate shows that the problem statement is wrong, say so and restart from step 1. Do not patch the frame in place.
 - The user makes the final decision. Do not present the winner as decided.

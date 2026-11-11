@@ -55,7 +55,7 @@ sequenceDiagram
   Note over W: Generate, skipped when args hold fixed options
   W->>G: 3 generators in parallel, then merge
   G-->>W: options + baseline
-  Note over W: code stops if fewer than 3 options or too many options
+  Note over W: code keeps the first 5 options, and stops if fewer than 3
   Note over W: Research
   W->>A: 1 advocate per option, in parallel
   A-->>W: cases (claims, weaknesses, failed tests)
@@ -70,7 +70,7 @@ sequenceDiagram
   W->>A: round 2, all at once
   A-->>W: refute / concede / partial, tagged by advocate
   Note over W: Rule
-  W->>R: 1 blind ruling per disputed challenge
+  W->>R: 1 blind ruling per disputed claim, with every challenge against it
   R-->>W: claim holds or not
   Note over W: code builds the dossier
   Note over W: Vote
@@ -80,6 +80,10 @@ sequenceDiagram
   W-->>S: result
   S->>U: report, and the user decides
 ```
+
+The merge prompt asks for at most 5 options, plus a baseline. If the problem statement says the change or build is already decided, the baseline is the simplest thing that meets the hard constraints. Otherwise the baseline is "change nothing". If the merge or the fixed `options` give more than 5 options, code keeps the first 5 and adds a warning. The "too many options" stop is still in the code for safety, but the cap makes it unreachable.
+
+A run makes at most 12 + 3N agent calls plus 1 ruling call per disputed claim. N is the number of options including the baseline, so N is at most 6. The 12 fixed calls are 3 generators, 1 merge, 1 referee filter, and 7 voters. Each option costs 1 advocate, 1 challenge call, and 1 reply call.
 
 If one generator fails, code drops its options and the run goes on. The run stops and returns a `stopped` reason when all 3 generators fail, when the merge fails, or when any agent from Research through Rule fails. The skill then offers to resume the run.
 
@@ -98,9 +102,9 @@ flowchart TD
   acc -->|referee rewrite,<br/>code: match by ID| neutral[neutral challenges]
   acc -->|code: no rewrite| warn[warnings]
   neutral -->|advocates, round 2| replies[replies<br/>tagged by advocate]
-  replies -->|code: classify| cls[concessions X1<br/>voided<br/>disputes R1<br/>unanswered U1<br/>drops]
+  replies -->|code: classify| cls[concessions X1<br/>voided<br/>disputes<br/>unanswered U1<br/>drops]
   replies -->|code: stray, duplicate| warn
-  cls -->|referee, blind| rul[rulings R1]
+  cls -->|code: group by claim,<br/>then referee, blind| rul[rulings R1<br/>1 per disputed claim]
   cls --> flips
   rul -->|code: flip counts| flips[flips<br/>sycophancy / stubbornness]
   args -->|problem| dos
@@ -148,7 +152,7 @@ Every item a voter can cite has an ID. Option labels are random letters that avo
 | `K-W1` | Weakness 1 of Option K | `numberCase` |
 | `CH1` | Accepted challenge 1 | `collectChallenges` |
 | `X1` | Concession with evidence | `classifyReplies` |
-| `R1` | Disputed challenge and its ruling; 2 rivals can dispute the same claim, and each dispute gets its own ID | `classifyReplies`, then the referee |
+| `R1` | Disputed claim and its ruling. 1 ruling covers every disputed challenge against the claim. IDs follow the order of each claim's first dispute | `groupDisputes`, then the referee |
 | `U1` | Unanswered challenge | `classifyReplies` |
 
 A ballot reason must cite at least one claim, weakness, ruling, concession, or unanswered ID. A bare option label does not count. `CH1` IDs are internal: voters cannot cite them.
@@ -164,8 +168,8 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 | `refereeModel` | yes | Model for the referee. The script compares it with `advocateModel` only when `advocateModel` is given. If `advocateModel` is left out, the skill must pick a referee model that differs from the session model |
 | `seed` | no | Integer for labels and voter order; default 1 |
 | `isolateAdvocates` | no | `true` runs the advocate research, challenge, reply, and ruling agents in git worktrees, because any of them may run tests. Generators, the merge, the referee filter, and voters never get a worktree |
-| `thresholds` | no | `{ sycophancy }`; default 0.75 |
-| `options`, `baseline` | no | Fixed options that skip Generate, for a hybrid round. Each is a string or `{ description }`. The script reads `baseline` only together with `options`, and ignores it otherwise. The default baseline is "Change nothing." |
+| `thresholds` | no | `{ sycophancy, stubbornAdverse }`; default `{ sycophancy: 0.75, stubbornAdverse: 2 }`. Sycophancy: the advocate conceded at least this share of the challenges against it. Stubbornness: the advocate conceded nothing and got at least `stubbornAdverse` adverse rulings. The script uses `stubbornAdverse` only when it is a positive integer |
+| `options`, `baseline` | no | Fixed options that skip Generate, for a hybrid round. Each is a string or `{ description }`. Code keeps the first 5 options and adds a warning if there are more. The script reads `baseline` only together with `options`, and ignores it otherwise. The default baseline is "Change nothing." |
 
 The script throws, before it starts any agent, if `problem` is missing, there are not exactly 7 personas, `refereeModel` is missing, `refereeModel` equals `advocateModel`, 2 personas have the same name, or a fixed option or baseline has no description.
 
@@ -174,7 +178,7 @@ The script throws, before it starts any agent, if `problem` is missing, there ar
 | Field | Holds |
 | --- | --- |
 | `stopped` | Present only when the run stops early. The reasons are: fewer than 3 options (merged options with an empty description do not count), too many options ("too many fixed options" when `options` was given, otherwise "too many options after the merge"), every ballot discarded, or a failed agent. A failed agent means all 3 generators, the merge, an advocate, a challenge agent, the referee filter, a reply agent, or a ruling. A failed-agent reason ends with "resume the run to retry it". A merge that returns no baseline is not a failed agent: a resume would replay the same answer, so its reason says to start the run again with a new seed. The other fields depend on the stop: a generator, merge, or too-many-options stop returns only `stopped`. A fewer-than-3-options stop and a failed advocate, challenge agent, referee filter, reply agent, or ruling return `stopped` and `options`. An every-ballot-discarded stop returns `stopped`, `options`, `dossier`, `rejectedChallenges`, `discarded`, and `warnings` |
-| `warnings` | Problems that did not stop the run: challenges the referee did not rewrite, and stray or duplicate replies |
+| `warnings` | Problems that did not stop the run: options cut to the first 5, challenges the referee did not rewrite, and stray or duplicate replies |
 | `options` | Labeled options, with the `baseline` flag |
 | `dossier` | Everything voters saw: the problem, claims with status and confidence (shown as `confidence 80 → 40` when a reply lowered it with an explanation; the lowest explained value counts), weaknesses, failed tests, rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, flip counts |
 | `rejectedChallenges` | Challenges stopped before delivery, with the reason: unknown claim, own claim, no evidence, or over limit |
@@ -196,9 +200,11 @@ The script throws, before it starts any agent, if `problem` is missing, there ar
 | Concessions must cite evidence | `classifyReplies` voids them (code) |
 | Confidence drops need evidence | `classifyReplies` records a drop with no `dropReason` as unexplained; for a concede or partial reply, its evidence counts as the explanation. Explained drops become the revised confidence that `buildDossier` shows to voters (code) |
 | Answer every challenge | `classifyReplies` records unanswered challenges (code) |
-| Rulings are binding | `buildDossier` marks the claim struck (code) |
+| Rulings are binding | `buildDossier` marks the claim struck (code). A false ruling counts as 1 adverse ruling for the option, however many challenges it covers |
 | Simultaneous rounds | `parallel()` with one call per advocate per round |
-| Blind referee | `rulingPrompt` shows no claim ID or option label |
+| Blind referee | `rulingPrompt` shows no claim ID, ruling ID, or option label |
+| 1 ruling per disputed claim | `groupDisputes` groups disputes by claim; `rulingPrompt` lists every challenge and defense (code) |
+| At most 5 options | Merge prompt, then code keeps the first 5 |
 | Neutral labels, shuffled order | `assignLabels`, `shuffle` with `seed`, `byOrder` (code) |
 | Reasons must cite evidence | `normalizeBallot` cleans labels and IDs, then `validateBallot` checks them (code) |
 | A failed agent never skews the dossier | The run stops with "resume the run to retry it" (code) |
