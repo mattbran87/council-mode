@@ -133,6 +133,17 @@ test('classifyReplies tolerates a round without replies', () => {
   assert.equal(out.unanswered.length, 2)
 })
 
+test('classifyReplies normalizes reply IDs and records non-object entries as stray', () => {
+  const out = classifyReplies(sc, [
+    { from: 'M', replies: [
+      { challengeId: ' ch1 ', kind: 'concede', evidence: 'bench', newConfidence: 70, reason: '' },
+      null,
+    ] },
+  ], index)
+  assert.equal(out.concessions.length, 1)
+  assert.deepEqual(out.stray, [{ from: 'M', challengeId: '' }])
+})
+
 test('flipStats ignores a non-numeric sycophancy threshold', () => {
   const chs = [{ id: 'CH1', against: 'M' }]
   const classified = { concessions: [{ challenge: chs[0] }], voided: [], disputes: [], unanswered: [], drops: [] }

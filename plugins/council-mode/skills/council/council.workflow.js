@@ -108,16 +108,18 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
   const out = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [], stray: [], duplicates: [] }
   for (const round of replyRounds || []) {
     for (const reply of round.replies || []) {
-      const ch = byId[reply.challengeId]
-      if (!ch || ch.against !== round.from) { out.stray.push({ from: round.from, challengeId: reply.challengeId }); continue }
-      if (replyFor[ch.id]) { out.duplicates.push({ from: round.from, challengeId: reply.challengeId }); continue }
+      if (!reply || typeof reply !== 'object') { out.stray.push({ from: round.from, challengeId: '' }); continue }
+      const replyId = String(reply.challengeId || '').trim().toUpperCase()
+      const ch = byId[replyId]
+      if (!ch || ch.against !== round.from) { out.stray.push({ from: round.from, challengeId: replyId }); continue }
+      if (replyFor[ch.id]) { out.duplicates.push({ from: round.from, challengeId: replyId }); continue }
       replyFor[ch.id] = reply
     }
   }
   for (const ch of challenges) {
     const reply = replyFor[ch.id]
     if (!reply) {
-      out.unanswered.push({ id: `U${out.unanswered.length + 1}`,challenge: ch })
+      out.unanswered.push({ id: `U${out.unanswered.length + 1}`, challenge: ch })
       continue
     }
     const evidence = String(reply.evidence || '').trim()
@@ -126,10 +128,10 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
       out.drops.push({ claim: ch.targetClaim, from: claim.confidence, to: reply.newConfidence })
     }
     if (reply.kind === 'concede') {
-      if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`,challenge: ch, evidence })
+      if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`, challenge: ch, evidence })
       else out.voided.push({ challenge: ch, reason: reply.reason || '' })
     } else {
-      out.disputes.push({ id: `R${out.disputes.length + 1}`,challenge: ch, reply: { ...reply, evidence } })
+      out.disputes.push({ id: `R${out.disputes.length + 1}`, challenge: ch, reply: { ...reply, evidence } })
     }
   }
   return out
