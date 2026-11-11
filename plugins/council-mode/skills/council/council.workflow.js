@@ -529,7 +529,7 @@ function mergePrompt(problem, candidates) {
     '',
     'Combine options that differ only in detail. Keep options that differ in approach.',
     'Write each merged option as one neutral paragraph of at most 80 words, with no name that sells it.',
-    'Also write a baseline option in the baseline field: "change nothing", or the simplest thing that meets the problem statement. Do not put the baseline in the options list.',
+    'Also write a baseline option in the baseline field. If the problem statement says the change or build is already decided, the baseline is the simplest thing that meets the hard constraints. Otherwise it is "change nothing". Do not put the baseline in the options list.',
   ].join('\n')
 }
 
