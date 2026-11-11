@@ -1,0 +1,6 @@
+{
+  "name": "council-mode",
+  "description": "Advocates argue each option with evidence, debate under a blind referee, and a frozen 7-persona panel ranks the options. Starts 20 or more subagents per run.",
+  "author": { "name": "Matthew Brandenburg" },
+  "keywords": ["decisions", "debate", "voting", "workflow", "multi-agent"]
+}

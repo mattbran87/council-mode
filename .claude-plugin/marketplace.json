@@ -1,0 +1,14 @@
+{
+  "name": "council-mode",
+  "owner": { "name": "Matthew Brandenburg" },
+  "metadata": {
+    "description": "Council Mode: evidence-backed advocates, a blind referee, and a 7-persona ranked vote for expensive decisions."
+  },
+  "plugins": [
+    {
+      "name": "council-mode",
+      "source": "./plugins/council-mode",
+      "description": "Advocates argue each option with evidence, debate under a blind referee, and a frozen 7-persona panel ranks the options. Starts 20 or more subagents per run."
+    }
+  ]
+}
