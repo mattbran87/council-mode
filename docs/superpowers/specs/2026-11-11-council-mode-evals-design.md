@@ -61,9 +61,9 @@ A stopped run (`result.stopped` present) gets only the checks that apply to the 
 | --- | --- | --- |
 | 1 | Ballots | Every kept ballot passes `validateBallot` against `dossierIds(dossier)` and the option labels, and every ID in every `cites` list exists in the dossier. |
 | 2 | Tally | `tally(labels, ballots)` recomputed from the kept ballots equals `result.result` (method, winner, tied, pairwise, borda, fragile, unacceptableVotes; `voters` when present). |
-| 3 | Flip stats | Recomputed per-option `challenged`, `conceded`, and `adverse` counts from the dossier's concessions, voided concessions, and rulings equal `dossier.flips`. Warnings are recomputed with the fixture's thresholds: the defaults in force at `scriptCommit`, recorded in `meta.json` as `thresholds`. |
+| 3 | Flip stats | Recomputed per-option `conceded` and `adverse` counts from the dossier's concessions, voided concessions, and rulings equal `dossier.flips`, and the warnings recomputed with the production `flipStats` equal the saved ones. `challenged` is taken from the saved flips, because the dossier does not store disputed challenges. Thresholds are the defaults in force at `scriptCommit`, recorded in `meta.json` as `thresholds`. |
 | 4 | Dossier integrity | Every claim's `status` matches the rulings (a false ruling means `struck`) and concessions (`conceded`), with struck taking precedence. No model-written text field (descriptions, claim text and source, weaknesses, failed tests, ruling notes, concession evidence, challenge text and evidence) still renders to more than one line or forges a heading, as checked through the production `renderDossier`. |
-| 5 | Blindness | For every ruling, the prompt rebuilt with the production `rulingPrompt` from the fixture's data contains no option label (`Option X`) and no claim ID. For every reply round, the prompt rebuilt with `replyPrompt` contains no challenger label. Because the journal holds no prompts, this checks the current builders on real data, not the prompts the old run sent. |
+| 5 | Blindness | For every ruling, the prompt rebuilt with the production `rulingPrompt` from the ruling's real claim (with a neutral placeholder challenge and defense) contains no claim ID (`X-C1`, `X-W1`) and no ruling ID: otherwise `FAIL`. Separately, any claim shown to the referee, or any saved challenge text, that mentions an option label (`Option X`) is listed as a `WARN`: that identity hint comes from model-written text, not from the builder. Because the journal holds no prompts, this checks the current builder on real data, not the prompts the old run sent. |
 | 6 | Cost | Reports agent count and total tokens, and compares the agent count with 12 + 3N + R (N options including the baseline, R rulings). Over the formula is a `WARN`, not a `FAIL`. |
 
 Version handling: R in check 6 is the number of ruling calls (`dossier.rulings.length`), so the formula holds for both `per-challenge` and `per-claim` fixtures; the first fixture gives 12 + 3 × 7 + 29 = 62, its exact agent count. The one version-dependent input is the flip thresholds, which `meta.json` records (`{ "sycophancy": 0.75, "stubbornAdverse": 1 }` for the first fixture). A future check that depends on behavior an older script lacked reports `n/a (pre-<feature>)`.
@@ -103,9 +103,8 @@ The starting set has 8 hand-written cases: 2 traps and 2 controls per stage, bui
 ### A probe call
 
 1. Build the stage prompt with the production builder from the case data. The reply stage wraps the case in a minimal one-option case and a one-challenge list (`CH1`).
-2. Append the schema instruction: "Return only a JSON object that matches this schema:" followed by the production schema (`REPLY_SCHEMA` or `RULING_SCHEMA`).
-3. Run one isolated `claude -p --output-format json` call with `--model` set to the stage's production model and `--max-budget-usd` set to the remaining budget, capped at $0.50 per call. Web search and web fetch are allowed, because a real advocate or referee can check a source; all other tools are denied.
-4. Parse the JSON object from the reply and check it against the schema. A reply that does not parse or does not match is an `invalid` row.
+2. Run one isolated `claude -p --output-format json` call, with the prompt on stdin, `--json-schema` set to the production schema (`REPLY_SCHEMA` or `RULING_SCHEMA`), `--model` set to the stage's production model, `--max-budget-usd` set to the remaining budget capped at $0.50 per call, and `--tools WebSearch,WebFetch`. Web search and fetch are allowed because a real advocate or referee can check a source; no other tool is available.
+3. Take the structured output from the CLI's JSON reply and check its shape against the schema. A reply without valid structured output is an `invalid` row.
 
 Each case runs 3 times, because one sample says little about a model that is sometimes fooled.
 
@@ -133,8 +132,8 @@ A stage passes when both shares are at least 5 of 6 valid runs. These thresholds
 
 All tests run offline inside `npm test` and never call the model.
 
-- **Layer 1:** `invariants.mjs` passes on the first fixture. Small broken copies built in the test each fail with the right check name: a ballot citing a missing ID, a tampered tally, a flip count off by one, a forged heading in claim text, a ruling prompt builder that leaks a label.
-- **Probe:** a fake runner, injected in place of the CLI call, checks prompt building with the production builders, schema instruction, JSON parsing and validation, scoring, the budget stop, resume, and the 3-failure stop.
+- **Layer 1:** `invariants.mjs` passes on the first fixture. Small broken copies built in the test each fail with the right check name: a ballot citing a missing ID, a tampered tally, a flip count off by one, a status that does not match the rulings, a renderer that lets a line break through, a ruling prompt builder that leaks a claim ID, and an agent count over the formula (a `WARN`).
+- **Probe:** a fake runner, injected in place of the CLI call, checks prompt building with the production builders, the CLI arguments (schema, model, budget, tools), structured-output parsing and shape checks, scoring, the budget stop, resume, and the 3-failure stop.
 - **Cases file:** every case has a valid `stage` and `kind`, non-empty claim and challenge text, a `defense` when the stage is `ruling`, and an `expect` that matches its stage and kind.
 
 ## The findings loop
