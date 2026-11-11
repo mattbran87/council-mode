@@ -33,7 +33,7 @@ function fakeCouncil(overrides = {}) {
       }
     }
     if (role === 'challenge') {
-      const rivals = [...new Set([...prompt.matchAll(/\b([A-Z])-C2\b/g)].map(m => m[1]))].filter(l => l !== key)
+      const rivals = [...new Set([...prompt.matchAll(/^- ([A-Z])-C2\b/gm)].map(m => m[1]))].filter(l => l !== key)
       return {
         challenges: [
           ...rivals.map(l => ({ targetClaim: `${l}-C2`, text: 'clearly not easy', evidence: 'diff size' })),
@@ -183,4 +183,138 @@ test('isolateAdvocates puts research agents in worktrees', async () => {
 
 test('missing personas throw before any agent runs', async () => {
   await assert.rejects(runWorkflow({ args: { ...ARGS, personas: PERSONAS.slice(0, 6) }, respond: fakeCouncil() }), /exactly 7/)
+})
+
+test('a normal run reports an empty warnings list', async () => {
+  const { result } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  assert.deepEqual(result.warnings, [])
+})
+
+test('a failed challenge agent stops the run before the referee', async () => {
+  const respond = fakeCouncil({ challenge: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /^the challenge agent for Option [A-Z] failed; resume the run to retry it$/)
+  assert.ok(result.options)
+  assert.ok(!calls.some(c => c.opts.label.startsWith('referee')))
+})
+
+test('a challenge result without a challenges array stops the run', async () => {
+  const respond = fakeCouncil({ challenge: () => ({}) })
+  const { result } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /^the challenge agent for Option [A-Z] failed/)
+})
+
+test('a failed referee filter stops the run before replies', async () => {
+  const respond = fakeCouncil({ referee: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'the referee filter failed; resume the run to retry it')
+  assert.ok(!calls.some(c => c.opts.label.startsWith('reply')))
+})
+
+test('a referee result without a challenges array stops the run', async () => {
+  const respond = fakeCouncil({ referee: () => ({}) })
+  const { result } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'the referee filter failed; resume the run to retry it')
+})
+
+test('the referee rewrite matches IDs loosely, and challenges it skipped are listed in warnings', async () => {
+  const respond = fakeCouncil({
+    referee: (key, prompt) => {
+      const ids = [...prompt.matchAll(/^(CH\d+) /gm)].map(m => m[1])
+      // A lowercase, padded ID still matches; CH2 and later get no rewrite.
+      return { challenges: [{ id: ` ${ids[0].toLowerCase()} `, text: 'not easy' }] }
+    },
+  })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  const prompts = calls.filter(c => c.opts.label.startsWith('reply')).map(c => c.prompt)
+  const ch1 = prompts.find(p => /^CH1 against/m.test(p))
+  assert.match(ch1, /^CH1 against \S+: not easy \|/m)
+  assert.match(result.warnings[0], /^referee did not rewrite CH2, CH3(, CH\d+)*; original wording kept$/)
+})
+
+test('the referee rewrite replaces the challenge wording', async () => {
+  const { calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  const replies = calls.filter(c => c.opts.label.startsWith('reply'))
+  assert.ok(replies.length > 0)
+  for (const c of replies) {
+    assert.match(c.prompt, /not easy/)
+    assert.doesNotMatch(c.prompt, /clearly/)
+  }
+})
+
+test('a failed reply agent stops the run before rulings', async () => {
+  const respond = fakeCouncil({ reply: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /^the reply agent for Option [A-Z] failed; resume the run to retry it$/)
+  assert.ok(!calls.some(c => c.opts.label.startsWith('ruling')))
+})
+
+test('a failed ruling stops the run before the vote', async () => {
+  const respond = fakeCouncil({ ruling: () => null })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /^the ruling for R\d+ failed; resume the run to retry it$/)
+  assert.ok(!calls.some(c => c.opts.label.startsWith('vote')))
+})
+
+test('ruling prompts are blind to option labels and claim IDs', async () => {
+  const { calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  const rulings = calls.filter(c => c.opts.label.startsWith('ruling'))
+  assert.ok(rulings.length > 0)
+  for (const c of rulings) {
+    assert.doesNotMatch(c.prompt, /Option [A-Z]/)
+    assert.doesNotMatch(c.prompt, /\b[A-Z]-C\d+\b/)
+  }
+})
+
+test('two runs with the same args make identical agent calls', async () => {
+  const a = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  const b = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  assert.equal(a.calls.length, b.calls.length)
+  a.calls.forEach((c, i) => {
+    assert.equal(c.prompt, b.calls[i].prompt)
+    assert.equal(JSON.stringify(c.opts), JSON.stringify(b.calls[i].opts))
+  })
+})
+
+test('a different seed gives different labels', async () => {
+  const a = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  const b = await runWorkflow({ args: { ...ARGS, seed: 12 }, respond: fakeCouncil() })
+  assert.notDeepEqual(a.result.options.map(o => o.label), b.result.options.map(o => o.label))
+})
+
+test('a numeric string seed counts as that number', async () => {
+  const a = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  const b = await runWorkflow({ args: { ...ARGS, seed: '11' }, respond: fakeCouncil() })
+  assert.deepEqual(a.result.options, b.result.options)
+})
+
+test('a missing refereeModel throws before any agent runs', async () => {
+  const { refereeModel, ...args } = ARGS
+  const labels = []
+  await assert.rejects(runWorkflow({ args, respond: l => { labels.push(l); return null } }), /refereeModel/)
+  assert.equal(labels.length, 0)
+})
+
+test('a referee model equal to the advocate model throws', async () => {
+  await assert.rejects(runWorkflow({ args: { ...ARGS, advocateModel: 'opus' }, respond: fakeCouncil() }), /refereeModel/)
+})
+
+test('duplicate persona names throw', async () => {
+  const personas = PERSONAS.map((p, i) => (i === 6 ? { ...p, name: 'Persona 1' } : p))
+  await assert.rejects(runWorkflow({ args: { ...ARGS, personas }, respond: fakeCouncil() }), /duplicate persona name/)
+})
+
+test('fixed options may be plain strings', async () => {
+  const args = { ...ARGS, options: ['alpha approach', 'beta approach', 'gamma approach'], baseline: 'baseline: change nothing' }
+  const { result } = await runWorkflow({ args, respond: fakeCouncil() })
+  const alpha = result.options.find(o => o.description === 'alpha approach').label
+  assert.equal(result.result.winner, alpha)
+  assert.equal(result.options.find(o => o.baseline).description, 'baseline: change nothing')
+})
+
+test('more merged options than labels stops the run', async () => {
+  const many = Array.from({ length: 17 }, (_, i) => ({ description: `option ${i}` }))
+  const respond = fakeCouncil({ merge: () => ({ options: many, baseline: 'nothing' }) })
+  const { result } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'too many options after the merge (17); narrow the problem statement')
 })

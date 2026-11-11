@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loadHelpers } from './harness.mjs'
 
-const { numberCase, indexClaims, collectChallenges, applyRewrites, classifyReplies, flipStats } =
-  loadHelpers('numberCase', 'indexClaims', 'collectChallenges', 'applyRewrites', 'classifyReplies', 'flipStats')
+const { numberCase, indexClaims, collectChallenges, applyRewrites, unrewrittenIds, classifyReplies, flipStats } =
+  loadHelpers('numberCase', 'indexClaims', 'collectChallenges', 'applyRewrites', 'unrewrittenIds', 'classifyReplies', 'flipStats')
 
 const raw = {
   claims: [
@@ -48,6 +48,18 @@ test('applyRewrites replaces text by ID and keeps the original when a rewrite is
   const chs = [{ id: 'CH1', text: 'clearly wrong' }, { id: 'CH2', text: 'keep me' }, { id: 'CH3', text: 'also keep' }]
   const out = applyRewrites(chs, [{ id: 'CH1', text: 'wrong' }, { id: 'CH3', text: ' ' }])
   assert.deepEqual(out.map(c => c.text), ['wrong', 'keep me', 'also keep'])
+})
+
+test('applyRewrites matches IDs after trimming and upper-casing', () => {
+  const chs = [{ id: 'CH1', text: 'clearly wrong' }, { id: 'CH2', text: 'keep me' }]
+  const out = applyRewrites(chs, [{ id: ' ch1 ', text: 'wrong' }, { text: 'no id' }])
+  assert.deepEqual(out.map(c => c.text), ['wrong', 'keep me'])
+})
+
+test('unrewrittenIds lists challenges with no usable rewrite', () => {
+  const chs = [{ id: 'CH1' }, { id: 'CH2' }, { id: 'CH3' }]
+  assert.deepEqual(unrewrittenIds(chs, [{ id: 'ch1', text: 'x' }, { id: 'CH3', text: ' ' }]), ['CH2', 'CH3'])
+  assert.deepEqual(unrewrittenIds(chs, null), ['CH1', 'CH2', 'CH3'])
 })
 
 test('classifyReplies sorts concessions, voided concessions, disputes, unanswered, and unexplained drops', () => {

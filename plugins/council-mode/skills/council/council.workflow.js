@@ -91,13 +91,26 @@ function collectChallenges(rounds, claimIndex) {
 }
 
 // Rule 3: the referee's neutral rewrite replaces the text; the evidence is never rewritten.
-function applyRewrites(challenges, rewrites) {
+function rewriteMap(rewrites) {
   const byId = {}
-  for (const r of rewrites || []) byId[r.id] = r.text
-  return challenges.map(c => {
-    const text = byId[c.id]
-    return text && text.trim() ? { ...c, text } : c
-  })
+  for (const r of rewrites || []) {
+    if (!r || typeof r !== 'object') continue
+    const id = String(r.id || '').trim().toUpperCase()
+    const text = String(r.text ?? '').trim()
+    if (id && text && !byId[id]) byId[id] = text
+  }
+  return byId
+}
+
+function applyRewrites(challenges, rewrites) {
+  const byId = rewriteMap(rewrites)
+  return challenges.map(c => (byId[c.id] ? { ...c, text: byId[c.id] } : c))
+}
+
+// Challenges that keep their original wording because the referee gave no usable rewrite.
+function unrewrittenIds(challenges, rewrites) {
+  const byId = rewriteMap(rewrites)
+  return challenges.filter(c => !byId[c.id]).map(c => c.id)
 }
 
 // Rules 2, 5, and 6: concessions need evidence, drops need evidence, silence is recorded.
@@ -615,13 +628,24 @@ function votePrompt(persona, dossierText, order) {
 const A = args || {}
 const personas = A.personas || []
 if (!A.problem || personas.length !== 7) throw new Error('council-mode needs args.problem and exactly 7 args.personas')
-const seed = Number.isInteger(A.seed) ? A.seed : 1
+if (!A.refereeModel) throw new Error('council-mode needs args.refereeModel')
+if (A.advocateModel && A.refereeModel === A.advocateModel) {
+  throw new Error('args.refereeModel must differ from args.advocateModel, so the referee does not judge its own model')
+}
+const personaNames = new Set()
+for (const p of personas) {
+  if (personaNames.has(p.name)) throw new Error(`duplicate persona name: ${p.name}`)
+  personaNames.add(p.name)
+}
+const seed = Number.isInteger(Number(A.seed)) ? Number(A.seed) : 1
 const budgetText = A.budget || 'at most 20 tool calls'
+const warnings = []
+const describeOf = o => (typeof o === 'string' ? o : o && o.description)
 
 // Step 2: generate, or take fixed options for a hybrid round.
 let described
 if (A.options) {
-  described = { options: A.options, baseline: A.baseline || 'Change nothing.' }
+  described = { options: A.options, baseline: describeOf(A.baseline) || 'Change nothing.' }
 } else {
   phase('Generate')
   const generated = (await parallel([1, 2, 3].map(n => () =>
@@ -632,8 +656,11 @@ if (A.options) {
     { label: 'merge', phase: 'Generate', schema: MERGE_SCHEMA })
   if (!described || !Array.isArray(described.options)) return { stopped: 'the merge agent failed; resume the run to retry it' }
 }
+if (described.options.length + 1 > LABEL_LETTERS.length) {
+  return { stopped: `too many options after the merge (${described.options.length}); narrow the problem statement` }
+}
 const options = assignLabels([
-  ...described.options.map(o => ({ description: o.description, baseline: false })),
+  ...described.options.map(o => ({ description: describeOf(o), baseline: false })),
   { description: described.baseline, baseline: true },
 ], makeRng(seed))
 if (described.options.length < 3) {
@@ -661,8 +688,13 @@ phase('Challenge')
 const round1 = await parallel(cases.map(c => () =>
   agent(challengePrompt(A.problem, c, cases.filter(k => k.label !== c.label), options), cleanOpts({
     label: `challenge:${c.label}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: A.advocateModel,
-  })).then(r => ({ from: c.label, challenges: (r && r.challenges) || [] }))))
-const { accepted, rejected } = collectChallenges(round1.filter(Boolean), claimIndex)
+  })).then(r => ({ from: c.label, challenges: r && Array.isArray(r.challenges) ? r.challenges : null }))))
+for (let i = 0; i < cases.length; i++) {
+  if (!round1[i] || !round1[i].challenges) {
+    return { stopped: `the challenge agent for Option ${cases[i].label} failed; resume the run to retry it`, options }
+  }
+}
+const { accepted, rejected } = collectChallenges(round1, claimIndex)
 if (rejected.length) log(`Referee rejected ${rejected.length} challenges before delivery.`)
 
 phase('Referee')
@@ -671,7 +703,14 @@ if (accepted.length) {
   const rewrite = await agent(refereeFilterPrompt(accepted), cleanOpts({
     label: 'referee:filter', phase: 'Referee', schema: REWRITE_SCHEMA, model: A.refereeModel,
   }))
-  challenges = applyRewrites(accepted, rewrite ? rewrite.challenges : [])
+  if (!rewrite || !Array.isArray(rewrite.challenges)) return { stopped: 'the referee filter failed; resume the run to retry it', options }
+  challenges = applyRewrites(accepted, rewrite.challenges)
+  const missing = unrewrittenIds(accepted, rewrite.challenges)
+  if (missing.length) {
+    const w = `referee did not rewrite ${missing.join(', ')}; original wording kept`
+    log(w)
+    warnings.push(w)
+  }
 }
 
 // Step 4, round 2: every advocate replies at the same time.
@@ -683,23 +722,41 @@ const replyLists = await parallel(cases.map(c => () => {
     label: `reply:${c.label}`, phase: 'Reply', schema: REPLY_SCHEMA, model: A.advocateModel,
   }))
 }))
+for (let i = 0; i < cases.length; i++) {
+  const challenged = challenges.some(ch => ch.against === cases[i].label)
+  if (challenged && (!replyLists[i] || !Array.isArray(replyLists[i].replies))) {
+    return { stopped: `the reply agent for Option ${cases[i].label} failed; resume the run to retry it`, options }
+  }
+}
 // Each advocate's replies stay tagged with its label, so a stray ID cannot answer a rival's challenge.
-const replyRounds = cases.map((c, i) => ({ from: c.label, replies: (replyLists[i] && replyLists[i].replies) || [] }))
+const replyRounds = cases.map((c, i) => ({ from: c.label, replies: replyLists[i].replies }))
 const classified = classifyReplies(challenges, replyRounds, claimIndex)
-if (classified.stray.length) log(`${classified.stray.length} replies named a challenge that was not against their option; ignored.`)
-if (classified.duplicates.length) log(`${classified.duplicates.length} duplicate replies ignored; the first reply counts.`)
+if (classified.stray.length) {
+  const w = `${classified.stray.length} replies named a challenge that was not against their option; ignored`
+  log(w)
+  warnings.push(w)
+}
+if (classified.duplicates.length) {
+  const w = `${classified.duplicates.length} duplicate replies ignored; the first reply counts`
+  log(w)
+  warnings.push(w)
+}
 
-// Blind rulings on every disputed claim.
+// Blind rulings on every disputed claim. Every ruling is binding, so a missing one stops the run.
 phase('Rule')
-const rulings = (await parallel(classified.disputes.map(d => () =>
+const rulingResults = await parallel(classified.disputes.map(d => () =>
   agent(rulingPrompt(d, claimIndex[d.challenge.targetClaim]), cleanOpts({
     label: `ruling:${d.id}`, phase: 'Rule', schema: RULING_SCHEMA, model: A.refereeModel,
-  })).then(r => r && {
+  }))))
+const rulings = []
+for (let i = 0; i < classified.disputes.length; i++) {
+  const d = classified.disputes[i]
+  const r = rulingResults[i]
+  if (!r || typeof r.claimHolds !== 'boolean') return { stopped: `the ruling for ${d.id} failed; resume the run to retry it`, options }
+  rulings.push({
     id: d.id, claim: d.challenge.targetClaim, against: d.challenge.against,
     claimHolds: r.claimHolds, checked: r.checked, note: r.note,
-  })))).filter(Boolean)
-if (rulings.length < classified.disputes.length) {
-  log(`${classified.disputes.length - rulings.length} disputed claims got no ruling; they stand unruled.`)
+  })
 }
 
 // Step 5: dossier.
@@ -728,7 +785,7 @@ ballots.forEach((b, i) => {
 })
 if (discarded.length) log(`${discarded.length} ballots discarded.`)
 if (!valid.length) {
-  return { stopped: 'every ballot was discarded, so there is no vote to tally', options, dossier, rejectedChallenges: rejected, discarded }
+  return { stopped: 'every ballot was discarded, so there is no vote to tally', options, dossier, rejectedChallenges: rejected, discarded, warnings }
 }
 
 // Step 7: tally.
@@ -743,4 +800,5 @@ return {
     flipCondition: b.flipCondition, unacceptable: b.unacceptable || [], hybrid: b.hybrid || '',
   })),
   discarded,
+  warnings,
 }
