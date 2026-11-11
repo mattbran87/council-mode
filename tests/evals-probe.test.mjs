@@ -122,3 +122,104 @@ test('runClaude passes the prompt on stdin and reports a spawn failure', () => {
   assert.match(dead.error, /ETIMEDOUT/)
   assert.equal(PER_CALL_CAP_USD, 0.5)
 })
+
+import { mkdtempSync, readFileSync, existsSync as exists } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as pjoin } from 'node:path'
+import { runProbe } from '../evals/probe.mjs'
+import { formatReport } from '../evals/report.mjs'
+import { openRun } from '../evals/lib/runstore.mjs'
+
+// A fake model: resists every trap and accepts every control.
+const goodModel = (cmd, args, opts) => {
+  const p = opts.input
+  const isRuling = /neutral referee/.test(p)
+  const trapLike = /MS-PERF-2291|go1\.23#ports|survey\/2025|x\/exp\/csv/.test(p)
+  const out = isRuling
+    ? { claimHolds: trapLike, checked: 'docs', note: 'n' }
+    : { replies: [{ challengeId: 'CH1', kind: trapLike ? 'refute' : 'concede', evidence: 'e', newConfidence: 50, dropReason: trapLike ? '' : 'e', reason: 'r' }] }
+  return { status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, duration_ms: 1000, structured_output: out }), stderr: '' }
+}
+
+const tmpRoot = () => mkdtempSync(pjoin(tmpdir(), 'cm-runs-'))
+
+test('runProbe scores all cases 3 times and the report shows both stages passing', () => {
+  const root = tmpRoot()
+  const res = runProbe({ runId: 't1', budgetUsd: 5, repeats: 3, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'abc1234' })
+  assert.equal(res.rows.length, 24)
+  assert.equal(res.score.reply.pass, true)
+  assert.equal(res.score.ruling.pass, true)
+  const md = formatReport(res.rows, res.run)
+  assert.match(md, /abc1234/)
+  assert.match(md, /\| reply \| 6\/6 \| 6\/6 \| 0 \| PASS \|/)
+  assert.ok(exists(pjoin(root, 't1', 'rows.jsonl')))
+})
+
+test('a rerun resumes and skips finished rows', () => {
+  const root = tmpRoot()
+  runProbe({ runId: 't2', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'x' })
+  let calls = 0
+  const counting = (...a) => { calls++; return goodModel(...a) }
+  const res = runProbe({ runId: 't2', budgetUsd: 5, repeats: 1, root, runner: counting, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(calls, 0)
+  assert.equal(res.rows.length, 8)
+})
+
+test('the budget cap stops the run and records it as partial', () => {
+  const root = tmpRoot()
+  const pricey = (...a) => { const r = goodModel(...a); const j = JSON.parse(r.stdout); j.total_cost_usd = 0.4; return { ...r, stdout: JSON.stringify(j) } }
+  const res = runProbe({ runId: 't3', budgetUsd: 1, repeats: 3, root, runner: pricey, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(res.stoppedBy, 'budget')
+  assert.ok(res.rows.length < 24)
+})
+
+test('3 failed calls in a row stop the run with the last error', () => {
+  const root = tmpRoot()
+  const broken = () => ({ error: new Error('ETIMEDOUT') })
+  const res = runProbe({ runId: 't4', budgetUsd: 5, repeats: 3, root, runner: broken, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(res.stoppedBy, 'failures')
+  assert.equal(res.rows.length, 3)
+  assert.match(res.lastError, /ETIMEDOUT/)
+})
+
+test('a call that reports no cost is recorded at the per-call cap', () => {
+  const root = tmpRoot()
+  const free = (...a) => { const r = goodModel(...a); const j = JSON.parse(r.stdout); delete j.total_cost_usd; return { ...r, stdout: JSON.stringify(j) } }
+  const res = runProbe({ runId: 't5', budgetUsd: 5, repeats: 1, root, runner: free, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(res.rows[0].cost, 0.5)
+  assert.equal(res.rows[0].costEstimated, true)
+})
+
+test('runProbe stops before any call when claude is missing', () => {
+  const res = runProbe({ runId: 't6', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: goodModel, argv0: null, scriptCommit: 'x' })
+  assert.equal(res.stoppedBy, 'no-claude')
+  assert.equal(res.rows.length, 0)
+})
+
+test('openRun keeps the latest row per case and attempt', () => {
+  const run = openRun('t7', tmpRoot())
+  run.append({ key: 'a#1', status: 'failed', cost: 0.5 })
+  run.append({ key: 'a#1', status: 'scored', cost: 0.01 })
+  assert.equal(run.latest().length, 1)
+  assert.equal(run.latest()[0].status, 'scored')
+  assert.equal(run.spent(), 0.51)
+})
+
+test('a rerun on a changed script commit runs again and the report splits by commit', () => {
+  const root = tmpRoot()
+  runProbe({ runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'aaa' })
+  const res = runProbe({ runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'bbb' })
+  assert.equal(res.rows.length, 16)
+  const md = formatReport(res.rows, res.run)
+  assert.match(md, /Script commit aaa/)
+  assert.match(md, /Script commit bbb/)
+})
+
+test('a reply with no structured output becomes an invalid row, not a failure', () => {
+  const root = tmpRoot()
+  const empty = () => ({ status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, duration_ms: 5 }), stderr: '' })
+  const res = runProbe({ runId: 't9', budgetUsd: 5, repeats: 1, root, runner: empty, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(res.stoppedBy, null)
+  assert.equal(res.rows.length, 8)
+  assert.ok(res.rows.every(r => r.status === 'invalid'))
+})
