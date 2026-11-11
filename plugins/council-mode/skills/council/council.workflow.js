@@ -74,9 +74,10 @@ function collectChallenges(rounds, claimIndex) {
   const rejected = []
   const perRival = {}
   for (const round of rounds) {
-    for (const c of round.challenges) {
-      const base = { from: round.from, targetClaim: c.targetClaim, text: c.text, evidence: (c.evidence || '').trim() }
-      const claim = claimIndex[c.targetClaim]
+    for (const c of round.challenges || []) {
+      const target = String(c.targetClaim || '').trim().toUpperCase()
+      const base = { from: round.from, targetClaim: target, text: c.text, evidence: String(c.evidence || '').trim() }
+      const claim = claimIndex[target]
       if (!claim) { rejected.push({ ...base, why: 'unknown claim' }); continue }
       if (claim.label === round.from) { rejected.push({ ...base, why: 'own claim' }); continue }
       if (!base.evidence) { rejected.push({ ...base, why: 'no evidence' }); continue }
@@ -100,26 +101,35 @@ function applyRewrites(challenges, rewrites) {
 }
 
 // Rules 2, 5, and 6: concessions need evidence, drops need evidence, silence is recorded.
-function classifyReplies(challenges, replies, claimIndex) {
+function classifyReplies(challenges, replyRounds, claimIndex) {
   const byId = {}
-  for (const r of replies) byId[r.challengeId] = r
-  const out = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [] }
+  for (const ch of challenges) byId[ch.id] = ch
+  const replyFor = {}
+  const out = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [], stray: [], duplicates: [] }
+  for (const round of replyRounds || []) {
+    for (const reply of round.replies || []) {
+      const ch = byId[reply.challengeId]
+      if (!ch || ch.against !== round.from) { out.stray.push({ from: round.from, challengeId: reply.challengeId }); continue }
+      if (replyFor[ch.id]) { out.duplicates.push({ from: round.from, challengeId: reply.challengeId }); continue }
+      replyFor[ch.id] = reply
+    }
+  }
   for (const ch of challenges) {
-    const reply = byId[ch.id]
+    const reply = replyFor[ch.id]
     if (!reply) {
-      out.unanswered.push({ id: `U${out.unanswered.length + 1}`, challenge: ch })
+      out.unanswered.push({ id: `U${out.unanswered.length + 1}`,challenge: ch })
       continue
     }
-    const evidence = (reply.evidence || '').trim()
+    const evidence = String(reply.evidence || '').trim()
     const claim = claimIndex[ch.targetClaim]
     if (typeof reply.newConfidence === 'number' && reply.newConfidence < claim.confidence && !evidence) {
       out.drops.push({ claim: ch.targetClaim, from: claim.confidence, to: reply.newConfidence })
     }
     if (reply.kind === 'concede') {
-      if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`, challenge: ch, evidence })
+      if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`,challenge: ch, evidence })
       else out.voided.push({ challenge: ch, reason: reply.reason || '' })
     } else {
-      out.disputes.push({ id: `R${out.disputes.length + 1}`, challenge: ch, reply: { ...reply, evidence } })
+      out.disputes.push({ id: `R${out.disputes.length + 1}`,challenge: ch, reply: { ...reply, evidence } })
     }
   }
   return out
@@ -127,7 +137,7 @@ function classifyReplies(challenges, replies, claimIndex) {
 
 // Voided concessions count as concessions here: they show the same give-way behavior.
 function flipStats(labels, challenges, classified, rulings, thresholds) {
-  const t = { ...DEFAULT_THRESHOLDS, ...(thresholds || {}) }
+  const t = { sycophancy: typeof (thresholds || {}).sycophancy === 'number' ? thresholds.sycophancy : DEFAULT_THRESHOLDS.sycophancy }
   return labels.map(label => {
     const challenged = challenges.filter(c => c.against === label).length
     const conceded =

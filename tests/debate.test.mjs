@@ -58,9 +58,13 @@ test('classifyReplies sorts concessions, voided concessions, disputes, unanswere
     { id: 'CH4', targetClaim: 'K-C2', against: 'K' },
   ]
   const out = classifyReplies(chs, [
-    { challengeId: 'CH1', kind: 'concede', evidence: 'bench shows 90 ms', newConfidence: 20, reason: '' },
-    { challengeId: 'CH2', kind: 'concede', evidence: '', newConfidence: 60, reason: 'fine' },
-    { challengeId: 'CH3', kind: 'refute', evidence: '', newConfidence: 50, reason: 'disagree' },
+    { from: 'M', replies: [
+      { challengeId: 'CH1', kind: 'concede', evidence: 'bench shows 90 ms', newConfidence: 20, reason: '' },
+      { challengeId: 'CH2', kind: 'concede', evidence: '', newConfidence: 60, reason: 'fine' },
+    ] },
+    { from: 'K', replies: [
+      { challengeId: 'CH3', kind: 'refute', evidence: '', newConfidence: 50, reason: 'disagree' },
+    ] },
   ], index)
   assert.deepEqual(out.concessions.map(x => [x.id, x.challenge.id]), [['X1', 'CH1']])
   assert.deepEqual(out.voided.map(v => v.challenge.id), ['CH2'])
@@ -91,4 +95,58 @@ test('flipStats accepts a custom sycophancy threshold', () => {
   const classified = { concessions: [{ challenge: chs[0] }], voided: [], disputes: [], unanswered: [], drops: [] }
   const stats = flipStats(['M'], chs, classified, [], { sycophancy: 0.5 })
   assert.deepEqual(stats[0].warnings, ['sycophancy'])
+})
+
+const sc = [
+  { id: 'CH1', targetClaim: 'M-C1', against: 'M' },
+  { id: 'CH2', targetClaim: 'K-C1', against: 'K' },
+]
+
+test('classifyReplies records unknown IDs and replies from the wrong option as stray', () => {
+  const out = classifyReplies(sc, [
+    { from: 'M', replies: [
+      { challengeId: 'CH9', kind: 'concede', evidence: 'x', newConfidence: 10, reason: '' },
+      { challengeId: 'CH2', kind: 'concede', evidence: 'x', newConfidence: 10, reason: '' },
+    ] },
+  ], index)
+  assert.deepEqual(out.stray, [{ from: 'M', challengeId: 'CH9' }, { from: 'M', challengeId: 'CH2' }])
+  assert.deepEqual(out.unanswered.map(u => [u.id, u.challenge.id]), [['U1', 'CH1'], ['U2', 'CH2']])
+  assert.deepEqual(out.concessions, [])
+  assert.deepEqual(out.drops, [])
+})
+
+test('classifyReplies counts the first reply per challenge and records duplicates', () => {
+  const out = classifyReplies(sc, [
+    { from: 'M', replies: [
+      { challengeId: 'CH1', kind: 'concede', evidence: 'bench', newConfidence: 70, reason: '' },
+      { challengeId: 'CH1', kind: 'refute', evidence: '', newConfidence: 70, reason: 'no' },
+    ] },
+  ], index)
+  assert.equal(out.concessions.length, 1)
+  assert.deepEqual(out.disputes, [])
+  assert.deepEqual(out.duplicates, [{ from: 'M', challengeId: 'CH1' }])
+  assert.deepEqual(Object.keys(out).sort(), ['concessions', 'disputes', 'drops', 'duplicates', 'stray', 'unanswered', 'voided'])
+})
+
+test('classifyReplies tolerates a round without replies', () => {
+  const out = classifyReplies(sc, [{ from: 'M' }], index)
+  assert.equal(out.unanswered.length, 2)
+})
+
+test('flipStats ignores a non-numeric sycophancy threshold', () => {
+  const chs = [{ id: 'CH1', against: 'M' }]
+  const classified = { concessions: [{ challenge: chs[0] }], voided: [], disputes: [], unanswered: [], drops: [] }
+  const stats = flipStats(['M'], chs, classified, [], { sycophancy: undefined })
+  assert.deepEqual(stats[0].warnings, ['sycophancy'])
+  const none = flipStats(['M'], [chs[0], { id: 'CH2', against: 'M' }], classified, [], { sycophancy: undefined })
+  assert.deepEqual(none[0].warnings, [])
+})
+
+test('collectChallenges normalizes target IDs and tolerates missing challenges', () => {
+  const { accepted } = collectChallenges([
+    { from: 'K', challenges: [{ targetClaim: ' m-c1 ', text: 't', evidence: 'e' }] },
+    { from: 'M' },
+  ], index)
+  assert.equal(accepted.length, 1)
+  assert.equal(accepted[0].targetClaim, 'M-C1')
 })
