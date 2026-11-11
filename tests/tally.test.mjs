@@ -23,6 +23,7 @@ test('Condorcet keeps the compromise option that instant runoff would drop (cent
   const result = tally(L, ballots(r))
   assert.equal(result.method, 'condorcet')
   assert.equal(result.winner, 'D')
+  assert.equal(result.voters, 7)
 })
 
 test('a Condorcet cycle falls back to Borda', () => {
@@ -47,6 +48,7 @@ test('no ballots is a tie of every option', () => {
   const result = tally(L, [])
   assert.equal(result.method, 'tie')
   assert.deepEqual(result.tied, L)
+  assert.equal(tally(L, []).voters, 0)
 })
 
 test('2 or more unacceptable marks on the winner flag the result as fragile', () => {

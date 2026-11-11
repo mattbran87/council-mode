@@ -13,6 +13,5 @@ test('label letters avoid the ID prefixes C, R, U, W, X', () => {
 })
 
 test('runWorkflow runs the script body', async () => {
-  const { result } = await runWorkflow({ args: {}, respond: () => null })
-  assert.ok(result)
+  await assert.rejects(runWorkflow({ args: {}, respond: () => null }), /exactly 7/)
 })

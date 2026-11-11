@@ -343,7 +343,7 @@ function tally(labels, ballots) {
     }
   }
   const unacceptableVotes = winner ? ballots.filter(b => (b.unacceptable || []).includes(winner)).length : 0
-  return { method, winner, tied, pairwise, borda, fragile: unacceptableVotes >= 2, unacceptableVotes }
+  return { method, winner, tied, pairwise, borda, fragile: unacceptableVotes >= 2, unacceptableVotes, voters: rankings.length }
 }
 
 const DESCRIPTION_ITEM = { type: 'object', properties: { description: { type: 'string' } }, required: ['description'] }
@@ -612,4 +612,132 @@ function votePrompt(persona, dossierText, order) {
 
 // --- pure helpers end
 
-return { stopped: 'orchestration not implemented yet' }
+const A = args || {}
+const personas = A.personas || []
+if (!A.problem || personas.length !== 7) throw new Error('council-mode needs args.problem and exactly 7 args.personas')
+const seed = Number.isInteger(A.seed) ? A.seed : 1
+const budgetText = A.budget || 'at most 20 tool calls'
+
+// Step 2: generate, or take fixed options for a hybrid round.
+let described
+if (A.options) {
+  described = { options: A.options, baseline: A.baseline || 'Change nothing.' }
+} else {
+  phase('Generate')
+  const generated = (await parallel([1, 2, 3].map(n => () =>
+    agent(generatorPrompt(A.problem, n), { label: `generate:${n}`, phase: 'Generate', schema: GENERATOR_SCHEMA })))).filter(Boolean)
+  described = await agent(mergePrompt(A.problem, generated.flatMap(g => g.options)),
+    { label: 'merge', phase: 'Generate', schema: MERGE_SCHEMA })
+}
+const options = assignLabels([
+  ...described.options.map(o => ({ description: o.description, baseline: false })),
+  { description: described.baseline, baseline: true },
+], makeRng(seed))
+if (described.options.length < 3) {
+  log(`Only ${described.options.length} distinct options after the merge; stopping before research.`)
+  return { stopped: 'fewer than 3 distinct options after the merge; the problem does not need a council', options }
+}
+const describe = label => options.find(o => o.label === label).description
+
+// Step 3: research. Barrier: round 1 needs every case.
+phase('Research')
+const rawCases = await parallel(options.map(o => () =>
+  agent(advocatePrompt(A.problem, o, budgetText), cleanOpts({
+    label: `advocate:${o.label}`, phase: 'Research', schema: CASE_SCHEMA,
+    model: A.advocateModel, isolation: A.isolateAdvocates ? 'worktree' : undefined,
+  }))))
+const cases = []
+for (let i = 0; i < options.length; i++) {
+  if (!rawCases[i]) return { stopped: `the advocate for Option ${options[i].label} failed; resume the run to retry it`, options }
+  cases.push(numberCase(options[i].label, rawCases[i]))
+}
+const claimIndex = indexClaims(cases)
+
+// Step 4, round 1: every advocate challenges at the same time.
+phase('Challenge')
+const round1 = await parallel(cases.map(c => () =>
+  agent(challengePrompt(A.problem, c, cases.filter(k => k.label !== c.label), options), cleanOpts({
+    label: `challenge:${c.label}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: A.advocateModel,
+  })).then(r => ({ from: c.label, challenges: (r && r.challenges) || [] }))))
+const { accepted, rejected } = collectChallenges(round1.filter(Boolean), claimIndex)
+if (rejected.length) log(`Referee rejected ${rejected.length} challenges before delivery.`)
+
+phase('Referee')
+let challenges = accepted
+if (accepted.length) {
+  const rewrite = await agent(refereeFilterPrompt(accepted), cleanOpts({
+    label: 'referee:filter', phase: 'Referee', schema: REWRITE_SCHEMA, model: A.refereeModel,
+  }))
+  challenges = applyRewrites(accepted, rewrite ? rewrite.challenges : [])
+}
+
+// Step 4, round 2: every advocate replies at the same time.
+phase('Reply')
+const replyLists = await parallel(cases.map(c => () => {
+  const against = challenges.filter(ch => ch.against === c.label)
+  if (!against.length) return Promise.resolve({ replies: [] })
+  return agent(replyPrompt(A.problem, c, against, describe(c.label)), cleanOpts({
+    label: `reply:${c.label}`, phase: 'Reply', schema: REPLY_SCHEMA, model: A.advocateModel,
+  }))
+}))
+// Each advocate's replies stay tagged with its label, so a stray ID cannot answer a rival's challenge.
+const replyRounds = cases.map((c, i) => ({ from: c.label, replies: (replyLists[i] && replyLists[i].replies) || [] }))
+const classified = classifyReplies(challenges, replyRounds, claimIndex)
+if (classified.stray.length) log(`${classified.stray.length} replies named a challenge that was not against their option; ignored.`)
+if (classified.duplicates.length) log(`${classified.duplicates.length} duplicate replies ignored; the first reply counts.`)
+
+// Blind rulings on every disputed claim.
+phase('Rule')
+const rulings = (await parallel(classified.disputes.map(d => () =>
+  agent(rulingPrompt(d, claimIndex[d.challenge.targetClaim]), cleanOpts({
+    label: `ruling:${d.id}`, phase: 'Rule', schema: RULING_SCHEMA, model: A.refereeModel,
+  })).then(r => r && {
+    id: d.id, claim: d.challenge.targetClaim, against: d.challenge.against,
+    claimHolds: r.claimHolds, checked: r.checked, note: r.note,
+  })))).filter(Boolean)
+if (rulings.length < classified.disputes.length) {
+  log(`${classified.disputes.length - rulings.length} disputed claims got no ruling; they stand unruled.`)
+}
+
+// Step 5: dossier.
+const labels = options.map(o => o.label)
+const flips = flipStats(labels, challenges, classified, rulings, A.thresholds)
+const dossier = buildDossier({ problem: A.problem, options, cases, classified, rulings, flips })
+const ids = dossierIds(dossier)
+
+// Step 6: vote, each voter with its own option order.
+phase('Vote')
+const ballots = await parallel(personas.map((p, i) => () => {
+  const order = shuffle(labels, makeRng(seed + 1000 + i))
+  return agent(votePrompt(p, renderDossier(dossier, order), order), cleanOpts({
+    label: `vote:${p.name}`, phase: 'Vote', schema: BALLOT_SCHEMA, model: p.model,
+  })).then(b => b && { ...b, persona: p.name, model: p.model, order })
+}))
+const valid = []
+const discarded = []
+ballots.forEach((b, i) => {
+  if (!b) { discarded.push({ persona: personas[i].name, problems: ['the voter agent failed'] }); return }
+  // Normalize "Option K", "k", "k-c1" first, so a format slip does not void a ballot that cites evidence.
+  const nb = normalizeBallot(b, labels, ids)
+  const check = validateBallot(nb, labels, ids)
+  if (check.valid) valid.push(nb)
+  else discarded.push({ persona: nb.persona, problems: check.problems })
+})
+if (discarded.length) log(`${discarded.length} ballots discarded.`)
+if (!valid.length) {
+  return { stopped: 'every ballot was discarded, so there is no vote to tally', options, dossier, rejectedChallenges: rejected, discarded }
+}
+
+// Step 7: tally.
+return {
+  options,
+  dossier,
+  rejectedChallenges: rejected,
+  result: tally(labels, valid),
+  citations: citationCounts(valid, ids),
+  ballots: valid.map(b => ({
+    persona: b.persona, model: b.model, ranking: b.ranking, reasons: b.reasons,
+    flipCondition: b.flipCondition, unacceptable: b.unacceptable || [], hybrid: b.hybrid || '',
+  })),
+  discarded,
+}
