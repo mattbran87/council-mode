@@ -1404,8 +1404,8 @@ function fakeCouncil(overrides = {}) {
       const ids = [...prompt.matchAll(/^(CH\d+) against/gm)].map(m => m[1])
       return {
         replies: ids.map((id, i) => i === 0
-          ? { challengeId: id, kind: 'concede', evidence: 'the diff is large', newConfidence: 30, reason: 'fair' }
-          : { challengeId: id, kind: 'refute', evidence: 'refactor log', newConfidence: 60, reason: 'no' }),
+          ? { challengeId: id, kind: 'concede', evidence: 'the diff is large', newConfidence: 30, dropReason: 'the diff is large', reason: 'fair' }
+          : { challengeId: id, kind: 'refute', evidence: 'refactor log', newConfidence: 60, dropReason: '', reason: 'no' }),
       }
     }
     if (role === 'ruling') return { claimHolds: true, checked: 'read the log', note: 'holds' }
@@ -1442,6 +1442,7 @@ test('a full run records rejected challenges, concessions, and rulings', async (
   assert.equal(result.dossier.concessions.length, 4)
   assert.ok(result.dossier.rulings.length > 0)
   assert.ok(result.dossier.rulings.every(r => r.claimHolds))
+  assert.deepEqual(result.dossier.drops, [])
 })
 
 test('the referee and voters get their own models; advocates do not get the referee model', async () => {
