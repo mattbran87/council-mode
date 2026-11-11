@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { listFixtures, loadFixture } from '../evals/lib/fixture.mjs'
 import { H } from '../evals/lib/helpers.mjs'
 
@@ -22,4 +25,21 @@ test('loadFixture reads meta, the workflow result, and the journal', () => {
   assert.equal(fx.top.agentCount, 62)
   assert.equal(fx.run.options.length, 7)
   assert.equal(fx.journal.length, 125)
+})
+
+function tmpFixture(result, journal) {
+  const dir = mkdtempSync(join(tmpdir(), 'fx-'))
+  writeFileSync(join(dir, 'meta.json'), '{}')
+  writeFileSync(join(dir, 'result.json'), JSON.stringify(result))
+  if (journal !== undefined) writeFileSync(join(dir, 'journal.jsonl'), journal)
+  return dir
+}
+
+test('a malformed journal line names the file and line number', () => {
+  const dir = tmpFixture({ result: {} }, '{"a":1}\r\n\r\n{bad\r\n')
+  assert.throws(() => loadFixture(dir), /journal\.jsonl:3: /)
+})
+
+test('result null is rejected', () => {
+  assert.throws(() => loadFixture(tmpFixture({ result: null })), /result\.json: result\.json has no workflow result/)
 })
