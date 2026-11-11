@@ -76,7 +76,7 @@ Rules against a hidden favorite:
 
 1. **Start 3 generators in parallel.** Each gets only the frozen problem statement.
 2. **Merge and deduplicate.** Combine options that differ only in detail. Keep options that differ in approach.
-3. **Add a baseline option**, such as "change nothing" or "the simplest thing that works."
+3. **Add a baseline option.** If the problem statement says the change or build is already decided, the baseline is the simplest thing that meets the hard constraints. Otherwise it is "change nothing". The baseline differs from every other option.
 4. **Assign random letter labels**, such as "Option K." Do not use names that sell.
 
 If the merge leaves fewer than 3 real options plus the baseline, stop and tell the user: the problem does not need a council.

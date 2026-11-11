@@ -61,7 +61,7 @@ Find this skill's base directory in the "Base directory for this skill" line sho
 
 If the Workflow call throws, the arguments are invalid (missing `problem`, not exactly 7 personas, missing `refereeModel`, equal referee and advocate models, duplicate persona names, or a fixed option or baseline without a description). Fix the arguments and start again.
 
-If the result has a `stopped` field, report the reason to the user and stop. If the reason ends with "resume the run to retry it", an agent failed: offer to resume the run with `resumeFromRunId`, which replays the finished agents from cache. If every ballot was discarded, show the discarded ballots and their problems. If the reason is "fewer than 3 distinct options", show the returned `options` to the user. If the reason is "too many options", restart from step 1 with a narrower problem statement.
+If the result has a `stopped` field, report the reason to the user and stop. If the reason ends with "resume the run to retry it", an agent failed: offer to resume the run with `resumeFromRunId`, which replays the finished agents from cache. If every ballot was discarded, show the discarded ballots and their problems. If the reason is "fewer than 3 distinct options", show the returned `options` to the user.
 
 ## Step 8: Report
 
@@ -80,6 +80,6 @@ If the margin is narrow — a Borda result, or a pairwise win by 1 vote (check `
 
 ## After the report
 
-- **Hybrid round.** If a hybrid candidate exists, ask the user whether to run a second round. If yes, start the workflow again with the same frozen frame, a new `seed`, `options` set to the hybrid first, then the original non-baseline option descriptions (the script keeps only the first 5 options, so with 5 originals drop the one the panel ranked lowest), and `baseline` set to the original baseline description.
+- **Hybrid round.** If a hybrid candidate exists, ask the user whether to run a second round. If yes, start the workflow again with the same frozen frame, a new `seed`, `options` set to the hybrid first, then the original non-baseline option descriptions in final-rank order (by `result.result.borda`, highest first; ties keep the original order), and `baseline` set to the original baseline description. The baseline is never in `options`. The script keeps only the first 5 options, so the cap drops the lowest-ranked original.
 - **Wrong frame.** If the debate shows that the problem statement is wrong, say so and restart from step 1. Do not patch the frame in place.
 - The user makes the final decision. Do not present the winner as decided.

@@ -49,6 +49,7 @@ test('the merge prompt fits the baseline to a decided change, and otherwise asks
   assert.ok(p.includes('If the problem statement says the change or build is already decided, the baseline is the simplest thing that meets the hard constraints.'))
   assert.ok(p.includes('Otherwise it is "change nothing".'))
   assert.ok(p.includes('Do not put the baseline in the options list.'))
+  assert.ok(p.includes('Make the baseline different from every option.'))
   assert.ok(!p.includes('or the simplest thing that meets the problem statement'))
 })
 
