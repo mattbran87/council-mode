@@ -346,6 +346,268 @@ function tally(labels, ballots) {
   return { method, winner, tied, pairwise, borda, fragile: unacceptableVotes >= 2, unacceptableVotes }
 }
 
+const DESCRIPTION_ITEM = { type: 'object', properties: { description: { type: 'string' } }, required: ['description'] }
+
+const GENERATOR_SCHEMA = {
+  type: 'object',
+  properties: { options: { type: 'array', minItems: 2, maxItems: 4, items: DESCRIPTION_ITEM } },
+  required: ['options'],
+}
+
+const MERGE_SCHEMA = {
+  type: 'object',
+  properties: { options: { type: 'array', items: DESCRIPTION_ITEM }, baseline: { type: 'string' } },
+  required: ['options', 'baseline'],
+}
+
+const CASE_SCHEMA = {
+  type: 'object',
+  properties: {
+    claims: {
+      type: 'array', minItems: 1, maxItems: 8,
+      items: {
+        type: 'object',
+        properties: {
+          evidence: { type: 'string', enum: ['tested', 'cited', 'reasoned'] },
+          text: { type: 'string' },
+          source: { type: 'string' },
+          confidence: { type: 'integer', minimum: 0, maximum: 100 },
+        },
+        required: ['evidence', 'text', 'confidence'],
+      },
+    },
+    weaknesses: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'string' } },
+    failedTests: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['claims', 'weaknesses', 'failedTests'],
+}
+
+const CHALLENGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    challenges: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { targetClaim: { type: 'string' }, text: { type: 'string' }, evidence: { type: 'string' } },
+        required: ['targetClaim', 'text', 'evidence'],
+      },
+    },
+  },
+  required: ['challenges'],
+}
+
+const REWRITE_SCHEMA = {
+  type: 'object',
+  properties: {
+    challenges: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, text: { type: 'string' } }, required: ['id', 'text'] },
+    },
+  },
+  required: ['challenges'],
+}
+
+const REPLY_SCHEMA = {
+  type: 'object',
+  properties: {
+    replies: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          challengeId: { type: 'string' },
+          kind: { type: 'string', enum: ['refute', 'concede', 'partial'] },
+          evidence: { type: 'string' },
+          newConfidence: { type: 'integer', minimum: 0, maximum: 100 },
+          reason: { type: 'string' },
+        },
+        required: ['challengeId', 'kind', 'evidence', 'newConfidence', 'reason'],
+      },
+    },
+  },
+  required: ['replies'],
+}
+
+const RULING_SCHEMA = {
+  type: 'object',
+  properties: { claimHolds: { type: 'boolean' }, checked: { type: 'string' }, note: { type: 'string' } },
+  required: ['claimHolds', 'checked', 'note'],
+}
+
+const BALLOT_SCHEMA = {
+  type: 'object',
+  properties: {
+    ranking: { type: 'array', items: { type: 'string' } },
+    reasons: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          higher: { type: 'string' },
+          lower: { type: 'string' },
+          reason: { type: 'string' },
+          cites: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['higher', 'lower', 'reason', 'cites'],
+      },
+    },
+    flipCondition: { type: 'string' },
+    unacceptable: { type: 'array', items: { type: 'string' } },
+    hybrid: { type: 'string' },
+  },
+  required: ['ranking', 'reasons', 'flipCondition', 'unacceptable', 'hybrid'],
+}
+
+function cleanOpts(opts) {
+  const out = {}
+  for (const key of Object.keys(opts)) {
+    const v = opts[key]
+    if (v !== undefined && v !== null && v !== '') out[key] = v
+  }
+  return out
+}
+
+function renderCase(c, description) {
+  const lines = [`Option ${c.label}: ${oneLine(description)}`]
+  for (const cl of c.claims) {
+    lines.push(`- ${cl.id} [${cl.evidence}] ${oneLine(cl.text)}${cl.source ? ` (${oneLine(cl.source)})` : ''}; confidence ${cl.confidence}`)
+  }
+  for (const w of c.weaknesses) lines.push(`- ${w.id} weakness: ${oneLine(w.text)}`)
+  lines.push(`- Failed tests: ${c.failedTests.length ? c.failedTests.map(oneLine).join('; ') : 'none'}`)
+  return lines.join('\n')
+}
+
+function generatorPrompt(problem, n) {
+  return [
+    `You are option generator ${n} of 3. The other generators work independently; you cannot see them.`,
+    'Problem statement (frozen; do not reinterpret it):',
+    problem,
+    '',
+    'Propose 2 to 4 options that differ in approach, not only in detail.',
+    'Describe each in one neutral paragraph of at most 80 words: what it is and how it works.',
+    'Do not argue for an option, and do not give it a name that sells it.',
+  ].join('\n')
+}
+
+function mergePrompt(problem, candidates) {
+  return [
+    'Merge these candidate options for one decision into a deduplicated list.',
+    'Problem statement:',
+    problem,
+    '',
+    'Candidates:',
+    ...candidates.map((o, i) => `${i + 1}. ${oneLine(o.description)}`),
+    '',
+    'Combine options that differ only in detail. Keep options that differ in approach.',
+    'Write each merged option as one neutral paragraph of at most 80 words, with no name that sells it.',
+    'Also write a baseline option in the baseline field: "change nothing", or the simplest thing that meets the problem statement. Do not put the baseline in the options list.',
+  ].join('\n')
+}
+
+function advocatePrompt(problem, option, budget) {
+  return [
+    `You are the advocate for Option ${option.label}. Build the strongest honest case for it.`,
+    'Problem statement (frozen):',
+    problem,
+    '',
+    `Option ${option.label}: ${option.description}`,
+    option.baseline ? 'This is the baseline option. Argue for it as seriously as any other option.' : '',
+    '',
+    `Research budget: ${budget}. Every advocate gets the same budget.`,
+    'Rules:',
+    '- Give at most 8 claims, each under 40 words.',
+    '- Label each claim by evidence: tested (you ran it; put the result or log path in source), cited (a source states it; put the link in source), or reasoned (argument only).',
+    '- Give each claim a confidence score from 0 to 100.',
+    '- Report exactly your 2 strongest weaknesses.',
+    '- Report every failed test. A hidden failed test is a rule violation.',
+  ].join('\n')
+}
+
+function challengePrompt(problem, own, rivals, options) {
+  const describe = label => options.find(o => o.label === label).description
+  return [
+    `You are the advocate for Option ${own.label}. This is debate round 1: challenge your rivals' claims.`,
+    'Problem statement (frozen):',
+    problem,
+    '',
+    'Your case:',
+    renderCase(own, describe(own.label)),
+    '',
+    'Rival cases:',
+    ...rivals.map(r => `${renderCase(r, describe(r.label))}\n`),
+    'Rules:',
+    '- Challenge at most 2 claims of each rival, by claim ID (for example M-C2).',
+    '- Every challenge must cite evidence: a test result, a source, or a claim ID from any case. A challenge without evidence is rejected.',
+    '- State each challenge plainly. Do not use words such as "clearly" or "obviously".',
+    '- If no rival claim is weak, return an empty list.',
+  ].join('\n')
+}
+
+function refereeFilterPrompt(challenges) {
+  return [
+    'You are a neutral referee. Rewrite each debate challenge below into neutral form.',
+    'Keep the exact factual content. Delete confidence and tone words such as "clearly", "obviously", and "any expert knows", and any appeal to authority.',
+    'Return every challenge by its ID. Do not add, drop, or merge challenges. Do not rewrite the evidence.',
+    '',
+    ...challenges.map(c => `${c.id} (against ${c.targetClaim}): ${oneLine(c.text)} | Evidence: ${oneLine(c.evidence)}`),
+  ].join('\n')
+}
+
+function replyPrompt(problem, own, against, description) {
+  return [
+    `You are the advocate for Option ${own.label}. This is debate round 2: reply to every challenge against your claims.`,
+    'Problem statement (frozen):',
+    problem,
+    '',
+    'Your case:',
+    renderCase(own, description),
+    '',
+    'Challenges (the authors are hidden):',
+    ...against.map(c => `${c.id} against ${c.targetClaim}: ${oneLine(c.text)} | Evidence: ${oneLine(c.evidence)}`),
+    '',
+    'Rules:',
+    '- Reply to every challenge by its ID. A challenge with no reply is shown to the voters as unanswered.',
+    '- kind: refute (give the evidence that defeats the challenge), concede (give the evidence that defeats your own claim), or partial (give the evidence for the part that stands).',
+    '- Concede only for evidence. Confident wording is not evidence. A concession without evidence is voided.',
+    '- newConfidence: your confidence in the challenged claim now. If it drops, the evidence field must name what caused the drop.',
+  ].join('\n')
+}
+
+// Blind: the referee sees the claim text, never its ID or option label.
+function rulingPrompt(dispute, claim) {
+  return [
+    'You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.',
+    `Claim [${claim.evidence}]: ${oneLine(claim.text)}${claim.source ? ` (source: ${oneLine(claim.source)})` : ''}`,
+    `Challenge: ${oneLine(dispute.challenge.text)}`,
+    `Challenge evidence: ${oneLine(dispute.challenge.evidence)}`,
+    `Defense (${dispute.reply.kind}): ${oneLine(dispute.reply.reason)}`,
+    `Defense evidence: ${oneLine(dispute.reply.evidence) || 'none given'}`,
+    '',
+    'Check the evidence yourself where you can: re-run the test or read the source.',
+    'claimHolds: true only if the claim survives the challenge. checked: what you checked. note: one sentence on why.',
+  ].join('\n')
+}
+
+function votePrompt(persona, dossierText, order) {
+  return [
+    `You are a voter on a decision panel. Your persona: ${persona.name}.`,
+    'Your criteria sheet:',
+    persona.criteria,
+    '',
+    'Rank every option by your criteria, using only the dossier below. The debate authors are hidden.',
+    '',
+    dossierText,
+    '',
+    'Ballot rules:',
+    `- ranking: every option label, best first. Labels: ${order.join(', ')}.`,
+    '- reasons: one entry for each adjacent pair in your ranking (higher over lower). cites: the dossier IDs the reason rests on, such as claim IDs (K-C1), weakness IDs (K-W1), rulings (R1), concessions (X1), or unanswered challenges (U1). A reason that cites no dossier ID voids your ballot.',
+    '- flipCondition: "my ranking changes if ...".',
+    '- unacceptable: labels of options you would reject outright, or an empty list.',
+    '- hybrid: a combination of options you would prefer, or an empty string.',
+  ].join('\n')
+}
+
 // --- pure helpers end
 
 return { stopped: 'orchestration not implemented yet' }
