@@ -176,9 +176,53 @@ test('fixed options skip generation', async () => {
   assert.equal(result.options.length, 4)
 })
 
-test('isolateAdvocates puts research agents in worktrees', async () => {
+test('isolateAdvocates puts research, challenge, reply, and ruling agents in worktrees', async () => {
   const { calls } = await runWorkflow({ args: { ...ARGS, isolateAdvocates: true }, respond: fakeCouncil() })
-  for (const c of calls.filter(c => c.opts.label.startsWith('advocate'))) assert.equal(c.opts.isolation, 'worktree')
+  for (const role of ['advocate', 'challenge', 'reply', 'ruling']) {
+    const mine = calls.filter(c => c.opts.label.startsWith(`${role}:`))
+    assert.ok(mine.length > 0, role)
+    for (const c of mine) assert.equal(c.opts.isolation, 'worktree', c.opts.label)
+  }
+  for (const c of calls.filter(c => /^(generate|merge|referee|vote)/.test(c.opts.label))) assert.equal(c.opts.isolation, undefined, c.opts.label)
+})
+
+test('without isolateAdvocates no agent gets a worktree', async () => {
+  const { calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  for (const c of calls) assert.equal(c.opts.isolation, undefined, c.opts.label)
+})
+
+test('revised confidence reaches the voters', async () => {
+  const { result, calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  // The fake concedes the first challenge against each option with confidence 30 and a drop reason.
+  const conceded = result.dossier.concessions.map(x => x.challenge.targetClaim)
+  const claims = result.dossier.options.flatMap(o => o.claims)
+  for (const id of conceded) assert.equal(claims.find(c => c.id === id).revisedConfidence, 30)
+  const vote = calls.find(c => c.opts.label.startsWith('vote')).prompt
+  assert.match(vote, new RegExp(`- ${conceded[0]} .*confidence \\d+ → 30;`))
+})
+
+test('too many fixed options says so', async () => {
+  const many = Array.from({ length: 17 }, (_, i) => `option ${i}`)
+  const { result } = await runWorkflow({ args: { ...ARGS, options: many }, respond: fakeCouncil() })
+  assert.equal(result.stopped, 'too many fixed options (17); narrow the problem statement')
+})
+
+test('merged options with an empty description are dropped before the 3-option check', async () => {
+  const respond = fakeCouncil({
+    merge: () => ({ options: [{ description: 'alpha approach' }, { description: '  ' }, { description: 'beta approach' }, {}], baseline: 'nothing' }),
+  })
+  const { result } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /fewer than 3/)
+  assert.equal(result.options.filter(o => !o.baseline).length, 2)
+})
+
+test('a merge without a baseline stops the run', async () => {
+  const respond = fakeCouncil({
+    merge: () => ({ options: [{ description: 'alpha approach' }, { description: 'beta approach' }, { description: 'gamma approach' }], baseline: ' ' }),
+  })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, 'the merge agent returned no baseline; resume the run to retry it')
+  assert.ok(!calls.some(c => c.opts.label.startsWith('advocate')))
 })
 
 test('missing personas throw before any agent runs', async () => {

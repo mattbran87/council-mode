@@ -37,6 +37,21 @@ test('buildDossier marks claim status from rulings and concessions', () => {
   assert.deepEqual(status, { 'K-C1': 'stands', 'K-C2': 'conceded', 'M-C1': 'struck', 'M-C2': 'stands' })
 })
 
+test('buildDossier and renderDossier show revised confidence', () => {
+  const d = buildDossier({ problem: 'p', options, cases, classified: { ...classified, revised: { 'K-C1': 40 } }, rulings, flips })
+  const k1 = d.options[0].claims.find(c => c.id === 'K-C1')
+  assert.equal(k1.confidence, 80)
+  assert.equal(k1.revisedConfidence, 40)
+  assert.equal(d.options[0].claims.find(c => c.id === 'K-C2').revisedConfidence, undefined)
+  const text = renderDossier(d, ['K', 'M'])
+  assert.match(text, /^- K-C1 .*; confidence 80 → 40; stands$/m)
+  assert.match(text, /^- K-C2 .*; confidence 60; conceded$/m)
+})
+
+test('a dossier built without revised confidence renders the original confidence', () => {
+  assert.match(renderDossier(dossier, ['K', 'M']), /^- K-C1 .*; confidence 80; stands$/m)
+})
+
 test('dossierIds holds claim, weakness, ruling, concession, and unanswered IDs, but not bare labels', () => {
   const ids = dossierIds(dossier)
   for (const id of ['K-C1', 'M-W2', 'R1', 'X1', 'U1']) assert.ok(ids.has(id), id)

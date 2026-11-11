@@ -118,7 +118,7 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
   const byId = {}
   for (const ch of challenges) byId[ch.id] = ch
   const replyFor = {}
-  const out = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [], stray: [], duplicates: [] }
+  const out = { concessions: [], voided: [], disputes: [], unanswered: [], drops: [], stray: [], duplicates: [], revised: {} }
   for (const round of replyRounds || []) {
     for (const reply of round.replies || []) {
       if (!reply || typeof reply !== 'object') { out.stray.push({ from: round.from, challengeId: '' }); continue }
@@ -137,8 +137,15 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
     }
     const evidence = String(reply.evidence || '').trim()
     const claim = claimIndex[ch.targetClaim]
-    if (typeof reply.newConfidence === 'number' && reply.newConfidence < claim.confidence && !String(reply.dropReason || '').trim()) {
-      out.drops.push({ claim: ch.targetClaim, from: claim.confidence, to: reply.newConfidence })
+    // A concede or partial reply's evidence explains its own drop; otherwise a drop needs a dropReason.
+    const explained = !!String(reply.dropReason || '').trim() ||
+      ((reply.kind === 'concede' || reply.kind === 'partial') && !!evidence)
+    if (typeof reply.newConfidence === 'number' && reply.newConfidence < claim.confidence) {
+      if (!explained) {
+        out.drops.push({ claim: ch.targetClaim, from: claim.confidence, to: reply.newConfidence })
+      } else if (!(ch.targetClaim in out.revised) || reply.newConfidence < out.revised[ch.targetClaim]) {
+        out.revised[ch.targetClaim] = reply.newConfidence
+      }
     }
     if (reply.kind === 'concede') {
       if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`, challenge: ch, evidence })
@@ -169,6 +176,7 @@ function flipStats(labels, challenges, classified, rulings, thresholds) {
 function buildDossier({ problem, options, cases, classified, rulings, flips }) {
   const struck = new Set(rulings.filter(r => !r.claimHolds).map(r => r.claim))
   const conceded = new Set(classified.concessions.map(x => x.challenge.targetClaim))
+  const revised = classified.revised || {}
   return {
     problem,
     options: options.map(o => {
@@ -178,6 +186,7 @@ function buildDossier({ problem, options, cases, classified, rulings, flips }) {
         description: o.description,
         claims: c.claims.map(cl => ({
           ...cl,
+          ...(typeof revised[cl.id] === 'number' ? { revisedConfidence: revised[cl.id] } : {}),
           status: struck.has(cl.id) ? 'struck' : conceded.has(cl.id) ? 'conceded' : 'stands',
         })),
         weaknesses: c.weaknesses,
@@ -227,7 +236,7 @@ function renderDossier(dossier, order) {
     const o = dossier.options.find(x => x.label === label)
     lines.push(`### Option ${o.label}`, oneLine(o.description), '')
     for (const c of o.claims) {
-      lines.push(`- ${c.id} [${c.evidence}] ${oneLine(c.text)}${c.source ? ` (${oneLine(c.source)})` : ''}; confidence ${c.confidence}; ${c.status}`)
+      lines.push(`- ${c.id} [${c.evidence}] ${oneLine(c.text)}${c.source ? ` (${oneLine(c.source)})` : ''}; confidence ${c.confidence}${typeof c.revisedConfidence === 'number' ? ` → ${c.revisedConfidence}` : ''}; ${c.status}`)
     }
     for (const w of o.weaknesses) lines.push(`- ${w.id} weakness: ${oneLine(w.text)}`)
     lines.push(`- Failed tests: ${o.failedTests.length ? o.failedTests.map(oneLine).join('; ') : 'none'}`, '')
@@ -639,6 +648,8 @@ for (const p of personas) {
 }
 const seed = Number.isInteger(Number(A.seed)) ? Number(A.seed) : 1
 const budgetText = A.budget || 'at most 20 tool calls'
+// Agents that may run code (research, challenges, replies, rulings) share one isolation setting.
+const advocateIsolation = A.isolateAdvocates ? 'worktree' : undefined
 const warnings = []
 const describeOf = o => (typeof o === 'string' ? o : o && o.description)
 
@@ -659,9 +670,16 @@ if (A.options) {
   described = await agent(mergePrompt(A.problem, generated.flatMap(g => g.options)),
     { label: 'merge', phase: 'Generate', schema: MERGE_SCHEMA })
   if (!described || !Array.isArray(described.options)) return { stopped: 'the merge agent failed; resume the run to retry it' }
+  const mergedBaseline = String(describeOf(described.baseline) ?? '').trim()
+  if (!mergedBaseline) return { stopped: 'the merge agent returned no baseline; resume the run to retry it' }
+  described = {
+    options: described.options.map(describeOf).filter(d => String(d ?? '').trim()),
+    baseline: mergedBaseline,
+  }
 }
 if (described.options.length + 1 > LABEL_LETTERS.length) {
-  return { stopped: `too many options after the merge (${described.options.length}); narrow the problem statement` }
+  const where = A.options ? 'too many fixed options' : 'too many options after the merge'
+  return { stopped: `${where} (${described.options.length}); narrow the problem statement` }
 }
 const options = assignLabels([
   ...described.options.map(o => ({ description: describeOf(o), baseline: false })),
@@ -678,7 +696,7 @@ phase('Research')
 const rawCases = await parallel(options.map(o => () =>
   agent(advocatePrompt(A.problem, o, budgetText), cleanOpts({
     label: `advocate:${o.label}`, phase: 'Research', schema: CASE_SCHEMA,
-    model: A.advocateModel, isolation: A.isolateAdvocates ? 'worktree' : undefined,
+    model: A.advocateModel, isolation: advocateIsolation,
   }))))
 const cases = []
 for (let i = 0; i < options.length; i++) {
@@ -692,6 +710,7 @@ phase('Challenge')
 const round1 = await parallel(cases.map(c => () =>
   agent(challengePrompt(A.problem, c, cases.filter(k => k.label !== c.label), options), cleanOpts({
     label: `challenge:${c.label}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: A.advocateModel,
+    isolation: advocateIsolation,
   })).then(r => ({ from: c.label, challenges: r && Array.isArray(r.challenges) ? r.challenges : null }))))
 for (let i = 0; i < cases.length; i++) {
   if (!round1[i] || !round1[i].challenges) {
@@ -724,6 +743,7 @@ const replyLists = await parallel(cases.map(c => () => {
   if (!against.length) return Promise.resolve({ replies: [] })
   return agent(replyPrompt(A.problem, c, against, describe(c.label)), cleanOpts({
     label: `reply:${c.label}`, phase: 'Reply', schema: REPLY_SCHEMA, model: A.advocateModel,
+    isolation: advocateIsolation,
   }))
 }))
 for (let i = 0; i < cases.length; i++) {
@@ -751,6 +771,7 @@ phase('Rule')
 const rulingResults = await parallel(classified.disputes.map(d => () =>
   agent(rulingPrompt(d, claimIndex[d.challenge.targetClaim]), cleanOpts({
     label: `ruling:${d.id}`, phase: 'Rule', schema: RULING_SCHEMA, model: A.refereeModel,
+    isolation: advocateIsolation,
   }))))
 const rulings = []
 for (let i = 0; i < classified.disputes.length; i++) {

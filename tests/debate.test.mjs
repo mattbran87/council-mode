@@ -85,6 +85,41 @@ test('classifyReplies sorts concessions, voided concessions, disputes, unanswere
   assert.deepEqual(out.drops, [{ claim: 'K-C1', from: 80, to: 50 }])
 })
 
+test('classifyReplies treats concede or partial evidence as the explanation for a drop', () => {
+  const chs = [
+    { id: 'CH1', targetClaim: 'M-C1', against: 'M' },
+    { id: 'CH2', targetClaim: 'M-C2', against: 'M' },
+    { id: 'CH3', targetClaim: 'K-C1', against: 'K' },
+  ]
+  const out = classifyReplies(chs, [
+    { from: 'M', replies: [
+      { challengeId: 'CH1', kind: 'concede', evidence: 'bench shows 90 ms', newConfidence: 20, dropReason: '', reason: '' },
+      { challengeId: 'CH2', kind: 'partial', evidence: 'only the read path is slow', newConfidence: 40, dropReason: '', reason: '' },
+    ] },
+    { from: 'K', replies: [
+      { challengeId: 'CH3', kind: 'refute', evidence: 'refactor log', newConfidence: 50, dropReason: '', reason: '' },
+    ] },
+  ], index)
+  assert.deepEqual(out.drops, [{ claim: 'K-C1', from: 80, to: 50 }])
+  assert.deepEqual(out.revised, { 'M-C1': 20, 'M-C2': 40 })
+})
+
+test('classifyReplies keeps the lowest explained confidence for each claim', () => {
+  const chs = [
+    { id: 'CH1', targetClaim: 'M-C1', against: 'M' },
+    { id: 'CH2', targetClaim: 'M-C1', against: 'M' },
+    { id: 'CH3', targetClaim: 'M-C2', against: 'M' },
+  ]
+  const out = classifyReplies(chs, [
+    { from: 'M', replies: [
+      { challengeId: 'CH1', kind: 'refute', evidence: 'x', newConfidence: 50, dropReason: 'one case fails', reason: '' },
+      { challengeId: 'CH2', kind: 'refute', evidence: 'y', newConfidence: 70, dropReason: 'edge case', reason: '' },
+      { challengeId: 'CH3', kind: 'refute', evidence: 'z', newConfidence: 90, dropReason: '', reason: '' },
+    ] },
+  ], index)
+  assert.deepEqual(out.revised, { 'M-C1': 50 })
+})
+
 test('flipStats warns on sycophancy at the threshold and on stubbornness', () => {
   const chs = [
     { id: 'CH1', against: 'M' }, { id: 'CH2', against: 'M' }, { id: 'CH3', against: 'M' }, { id: 'CH4', against: 'M' },
@@ -137,7 +172,7 @@ test('classifyReplies counts the first reply per challenge and records duplicate
   assert.equal(out.concessions.length, 1)
   assert.deepEqual(out.disputes, [])
   assert.deepEqual(out.duplicates, [{ from: 'M', challengeId: 'CH1' }])
-  assert.deepEqual(Object.keys(out).sort(), ['concessions', 'disputes', 'drops', 'duplicates', 'stray', 'unanswered', 'voided'])
+  assert.deepEqual(Object.keys(out).sort(), ['concessions', 'disputes', 'drops', 'duplicates', 'revised', 'stray', 'unanswered', 'voided'])
 })
 
 test('classifyReplies tolerates a round without replies', () => {

@@ -163,7 +163,7 @@ A ballot reason must cite at least one claim, weakness, ruling, concession, or u
 | `advocateModel` | no | Model for advocates; default is the session model |
 | `refereeModel` | yes | Model for the referee. The script compares it with `advocateModel` only when `advocateModel` is given. If `advocateModel` is left out, the skill must pick a referee model that differs from the session model |
 | `seed` | no | Integer for labels and voter order; default 1 |
-| `isolateAdvocates` | no | `true` runs research agents in git worktrees |
+| `isolateAdvocates` | no | `true` runs the advocate research, challenge, reply, and ruling agents in git worktrees, because any of them may run tests. Generators, the merge, the referee filter, and voters never get a worktree |
 | `thresholds` | no | `{ sycophancy }`; default 0.75 |
 | `options`, `baseline` | no | Fixed options that skip Generate, for a hybrid round. Each is a string or `{ description }`. The script reads `baseline` only together with `options`, and ignores it otherwise. The default baseline is "Change nothing." |
 
@@ -173,10 +173,10 @@ The script throws, before it starts any agent, if `problem` is missing, there ar
 
 | Field | Holds |
 | --- | --- |
-| `stopped` | Present only when the run stops early. The reasons are: fewer than 3 options, too many options, every ballot discarded, or a failed agent. A failed agent means all 3 generators, the merge, an advocate, a challenge agent, the referee filter, a reply agent, or a ruling. A failed-agent reason ends with "resume the run to retry it". The other fields depend on the stop: a generator, merge, or too-many-options stop returns only `stopped`. A fewer-than-3-options stop and a failed advocate, challenge agent, referee filter, reply agent, or ruling return `stopped` and `options`. An every-ballot-discarded stop returns `stopped`, `options`, `dossier`, `rejectedChallenges`, `discarded`, and `warnings` |
+| `stopped` | Present only when the run stops early. The reasons are: fewer than 3 options (merged options with an empty description do not count), too many options ("too many fixed options" when `options` was given, otherwise "too many options after the merge"), every ballot discarded, or a failed agent. A failed agent means all 3 generators, the merge (including a merge that returns no baseline), an advocate, a challenge agent, the referee filter, a reply agent, or a ruling. A failed-agent reason ends with "resume the run to retry it". The other fields depend on the stop: a generator, merge, or too-many-options stop returns only `stopped`. A fewer-than-3-options stop and a failed advocate, challenge agent, referee filter, reply agent, or ruling return `stopped` and `options`. An every-ballot-discarded stop returns `stopped`, `options`, `dossier`, `rejectedChallenges`, `discarded`, and `warnings` |
 | `warnings` | Problems that did not stop the run: challenges the referee did not rewrite, and stray or duplicate replies |
 | `options` | Labeled options, with the `baseline` flag |
-| `dossier` | Everything voters saw: the problem, claims with status, weaknesses, failed tests, rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, flip counts |
+| `dossier` | Everything voters saw: the problem, claims with status and confidence (shown as `confidence 80 → 40` when a reply lowered it with an explanation; the lowest explained value counts), weaknesses, failed tests, rulings, concessions, voided concessions, unanswered challenges, unexplained confidence drops, flip counts |
 | `rejectedChallenges` | Challenges stopped before delivery, with the reason: unknown claim, own claim, no evidence, or over limit |
 | `result` | `method` (condorcet, borda, tie), `winner`, `tied`, `pairwise`, `borda`, `fragile`, `unacceptableVotes`, `voters` |
 | `citations` | Dossier IDs with the number of voters who cited each, most cited first |
@@ -190,11 +190,11 @@ The script throws, before it starts any agent, if `problem` is missing, there ar
 | Challenges must cite evidence | `collectChallenges` (code) |
 | At most 2 challenges per rival | `collectChallenges` (code) |
 | Strip the tone | Referee filter agent; `applyRewrites` keeps the evidence unchanged |
-| Hide identities | Prompts: replies and ballots never show who wrote a challenge or which model an advocate uses; the referee filter removes references to the author |
+| Hide identities | Prompts: replies and ballots never show who wrote a challenge or which model an advocate uses; the referee filter removes references to the author. The referee keeps evidence text unchanged, so an author reference inside the evidence can still reach the replying advocate |
 | Model text cannot forge structure | `oneLine` flattens text in prompts and the dossier (code) |
 | Replies answer only own challenges | `classifyReplies` ignores stray and duplicate replies (code) |
 | Concessions must cite evidence | `classifyReplies` voids them (code) |
-| Confidence drops need evidence | `classifyReplies` records drops with no `dropReason` (code) |
+| Confidence drops need evidence | `classifyReplies` records a drop with no `dropReason` as unexplained; for a concede or partial reply, its evidence counts as the explanation. Explained drops become the revised confidence that `buildDossier` shows to voters (code) |
 | Answer every challenge | `classifyReplies` records unanswered challenges (code) |
 | Rulings are binding | `buildDossier` marks the claim struck (code) |
 | Simultaneous rounds | `parallel()` with one call per advocate per round |
