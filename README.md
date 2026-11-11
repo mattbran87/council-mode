@@ -34,3 +34,5 @@ claude plugin validate ./plugins/council-mode
 Do not run `claude plugin validate --strict`. The plugin sets no `version`, so `--strict` turns the `No version specified` warning into an error.
 
 The workflow script must stay plain JavaScript, start with `export const meta`, and never call `Date.now()`, `Math.random()`, or argless `new Date()`. Helper code lives between the `// --- pure helpers start` and `// --- pure helpers end` markers, which `tests/harness.mjs` loads directly.
+
+Evals: `node evals/invariants.mjs` checks saved runs for free; `node evals/probe.mjs --run-id <id> --budget-usd 5` runs the fake-evidence probe. See [evals/README.md](evals/README.md).
