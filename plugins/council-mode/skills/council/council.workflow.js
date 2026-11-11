@@ -237,6 +237,36 @@ function renderDossier(dossier, order) {
   return lines.join('\n')
 }
 
+// A reason without a valid dossier ID is probably stereotype voting, so it voids the ballot.
+function validateBallot(ballot, labels, ids) {
+  const problems = []
+  const ranking = ballot.ranking || []
+  const full = ranking.length === labels.length &&
+    new Set(ranking).size === labels.length &&
+    ranking.every(l => labels.includes(l))
+  if (!full) return { valid: false, problems: ['ranking is not a full ranking of all options'] }
+  for (let i = 0; i < ranking.length - 1; i++) {
+    const higher = ranking[i]
+    const lower = ranking[i + 1]
+    const reason = (ballot.reasons || []).find(r => r.higher === higher && r.lower === lower)
+    if (!reason) { problems.push(`no reason for ${higher} over ${lower}`); continue }
+    if (!(reason.cites || []).some(id => ids.has(id))) problems.push(`reason for ${higher} over ${lower} cites no dossier ID`)
+  }
+  return { valid: problems.length === 0, problems }
+}
+
+function citationCounts(ballots, ids) {
+  const counts = {}
+  for (const b of ballots) {
+    const seen = new Set()
+    for (const r of b.reasons || []) for (const id of r.cites || []) if (ids.has(id)) seen.add(id)
+    for (const id of seen) counts[id] = (counts[id] || 0) + 1
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, voters]) => ({ id, voters }))
+}
+
 // --- pure helpers end
 
 return { stopped: 'orchestration not implemented yet' }
