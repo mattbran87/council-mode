@@ -201,10 +201,12 @@ test('revised confidence reaches the voters', async () => {
   assert.match(vote, new RegExp(`- ${conceded[0]} .*confidence \\d+ → 30;`))
 })
 
-test('too many fixed options says so', async () => {
+test('more than 5 fixed options keeps the first 5 and warns', async () => {
   const many = Array.from({ length: 17 }, (_, i) => `option ${i}`)
   const { result } = await runWorkflow({ args: { ...ARGS, options: many }, respond: fakeCouncil() })
-  assert.equal(result.stopped, 'too many fixed options (17); narrow the problem statement')
+  assert.equal(result.stopped, undefined)
+  assert.deepEqual(result.options.filter(o => !o.baseline).map(o => o.description), many.slice(0, 5))
+  assert.ok(result.warnings.includes('got 17 fixed options; kept the first 5'))
 })
 
 test('merged options with an empty description are dropped before the 3-option check', async () => {
@@ -366,9 +368,44 @@ test('fixed options or a baseline without a description throw before any agent r
   assert.equal(labels.length, 0)
 })
 
-test('more merged options than labels stops the run', async () => {
-  const many = Array.from({ length: 17 }, (_, i) => ({ description: `option ${i}` }))
+test('more than 5 merged options keeps the first 5 and warns', async () => {
+  const many = Array.from({ length: 7 }, (_, i) => ({ description: `option ${i}` }))
   const respond = fakeCouncil({ merge: () => ({ options: many, baseline: 'nothing' }) })
+  const { result, calls } = await runWorkflow({ args: ARGS, respond })
+  assert.equal(result.stopped, undefined)
+  assert.deepEqual(result.options.filter(o => !o.baseline).map(o => o.description), many.slice(0, 5).map(o => o.description))
+  assert.equal(result.options.length, 6)
+  assert.equal(calls.filter(c => c.opts.label.startsWith('advocate:')).length, 6)
+  assert.ok(result.warnings.includes('merged 7 options; kept the first 5'))
+})
+
+test('the merge prompt in a run asks for at most 5 options', async () => {
+  const { calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  assert.match(calls.find(c => c.opts.label === 'merge').prompt, /at most 5 options; keep the most different approaches/)
+})
+
+test('one ruling call per disputed claim covers every challenge against it', async () => {
+  const { result, calls } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  // The fake: every advocate challenges each rival's C2, and each option concedes its first challenge and refutes the rest.
+  const rulingCalls = calls.filter(c => c.opts.label.startsWith('ruling:'))
+  const rulings = result.dossier.rulings
+  assert.equal(rulingCalls.length, 4)
+  assert.deepEqual(rulings.map(r => r.id), ['R1', 'R2', 'R3', 'R4'])
+  assert.equal(new Set(rulings.map(r => r.claim)).size, 4)
+  assert.deepEqual(rulingCalls.map(c => c.opts.label), ['ruling:R1', 'ruling:R2', 'ruling:R3', 'ruling:R4'])
+  for (const c of rulingCalls) {
+    assert.match(c.prompt, /^Challenge 1: /m)
+    assert.match(c.prompt, /^Challenge 2: /m)
+    assert.doesNotMatch(c.prompt, /^Challenge 3: /m)
+  }
+})
+
+test('a false ruling applies to the whole claim group and counts once as adverse', async () => {
+  const respond = fakeCouncil({ ruling: () => ({ claimHolds: false, checked: 'diff', note: 'not easy' }) })
   const { result } = await runWorkflow({ args: ARGS, respond })
-  assert.equal(result.stopped, 'too many options after the merge (17); narrow the problem statement')
+  for (const f of result.dossier.flips) assert.equal(f.adverse, 1, f.label)
+  for (const r of result.dossier.rulings) {
+    const claim = result.dossier.options.flatMap(o => o.claims).find(c => c.id === r.claim)
+    assert.equal(claim.status, 'struck')
+  }
 })

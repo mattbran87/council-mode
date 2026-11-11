@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loadHelpers } from './harness.mjs'
 
-const { numberCase, indexClaims, collectChallenges, applyRewrites, unrewrittenIds, classifyReplies, flipStats } =
-  loadHelpers('numberCase', 'indexClaims', 'collectChallenges', 'applyRewrites', 'unrewrittenIds', 'classifyReplies', 'flipStats')
+const { numberCase, indexClaims, collectChallenges, applyRewrites, unrewrittenIds, classifyReplies, groupDisputes, flipStats } =
+  loadHelpers('numberCase', 'indexClaims', 'collectChallenges', 'applyRewrites', 'unrewrittenIds', 'classifyReplies', 'groupDisputes', 'flipStats')
 
 const raw = {
   claims: [
@@ -80,7 +80,7 @@ test('classifyReplies sorts concessions, voided concessions, disputes, unanswere
   ], index)
   assert.deepEqual(out.concessions.map(x => [x.id, x.challenge.id]), [['X1', 'CH1']])
   assert.deepEqual(out.voided.map(v => v.challenge.id), ['CH2'])
-  assert.deepEqual(out.disputes.map(d => [d.id, d.challenge.id]), [['R1', 'CH3']])
+  assert.deepEqual(out.disputes.map(d => d.challenge.id), ['CH3'])
   assert.deepEqual(out.unanswered.map(u => [u.id, u.challenge.id]), [['U1', 'CH4']])
   assert.deepEqual(out.drops, [{ claim: 'K-C1', from: 80, to: 50 }])
 })
@@ -157,6 +157,16 @@ test('flipStats accepts a custom stubbornAdverse threshold and ignores one that 
   for (const bad of [0, -1, 1.5, '1', undefined]) {
     assert.deepEqual(flipStats(['K'], chs, classified, one, { stubbornAdverse: bad })[0].warnings, [], String(bad))
   }
+})
+
+test('groupDisputes makes one group per disputed claim, with R IDs in first-dispute order', () => {
+  const d = (id, targetClaim, against) => ({ challenge: { id, targetClaim, against }, reply: { kind: 'refute' } })
+  const groups = groupDisputes([d('CH1', 'M-C2', 'M'), d('CH2', 'K-C1', 'K'), d('CH3', 'M-C2', 'M')])
+  assert.deepEqual(groups.map(g => [g.id, g.claim, g.against, g.items.map(i => i.challenge.id)]), [
+    ['R1', 'M-C2', 'M', ['CH1', 'CH3']],
+    ['R2', 'K-C1', 'K', ['CH2']],
+  ])
+  assert.deepEqual(groupDisputes([]), [])
 })
 
 test('flipStats accepts a custom sycophancy threshold', () => {

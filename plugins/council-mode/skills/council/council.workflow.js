@@ -46,6 +46,8 @@ function assignLabels(options, rng) {
 
 const DEFAULT_THRESHOLDS = { sycophancy: 0.75, stubbornAdverse: 2 }
 const MAX_CHALLENGES_PER_RIVAL = 2
+// Non-baseline options per run. Each option costs 3 agent calls plus its rulings.
+const MAX_OPTIONS = 5
 
 function numberCase(label, raw) {
   return {
@@ -151,10 +153,25 @@ function classifyReplies(challenges, replyRounds, claimIndex) {
       if (evidence) out.concessions.push({ id: `X${out.concessions.length + 1}`, challenge: ch, evidence })
       else out.voided.push({ challenge: ch, reason: reply.reason || '' })
     } else {
-      out.disputes.push({ id: `R${out.disputes.length + 1}`, challenge: ch, reply: { ...reply, evidence } })
+      out.disputes.push({ challenge: ch, reply: { ...reply, evidence } })
     }
   }
   return out
+}
+
+// One ruling per disputed claim: R IDs follow the order of each claim's first dispute.
+function groupDisputes(disputes) {
+  const groups = []
+  const byClaim = {}
+  for (const d of disputes) {
+    const claim = d.challenge.targetClaim
+    if (!byClaim[claim]) {
+      byClaim[claim] = { id: `R${groups.length + 1}`, claim, against: d.challenge.against, items: [] }
+      groups.push(byClaim[claim])
+    }
+    byClaim[claim].items.push(d)
+  }
+  return groups
 }
 
 // Voided concessions count as concessions here: they show the same give-way behavior.
@@ -528,6 +545,7 @@ function mergePrompt(problem, candidates) {
     ...candidates.map((o, i) => `${i + 1}. ${oneLine(o.description)}`),
     '',
     'Combine options that differ only in detail. Keep options that differ in approach.',
+    `Give at most ${MAX_OPTIONS} options; keep the most different approaches.`,
     'Write each merged option as one neutral paragraph of at most 80 words, with no name that sells it.',
     'Also write a baseline option in the baseline field. If the problem statement says the change or build is already decided, the baseline is the simplest thing that meets the hard constraints. Otherwise it is "change nothing". Do not put the baseline in the options list.',
   ].join('\n')
@@ -603,19 +621,29 @@ function replyPrompt(problem, own, against, description) {
   ].join('\n')
 }
 
-// Blind: the referee sees the claim text, never its ID or option label.
-function rulingPrompt(dispute, claim) {
-  return [
+// Blind: the referee sees the claim text, never its ID, its ruling ID, or its option label.
+function rulingPrompt(group, claim) {
+  const lines = [
     'You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.',
     `Claim [${claim.evidence}]: ${oneLine(claim.text)}${claim.source ? ` (source: ${oneLine(claim.source)})` : ''}`,
-    `Challenge: ${oneLine(dispute.challenge.text)}`,
-    `Challenge evidence: ${oneLine(dispute.challenge.evidence)}`,
-    `Defense (${dispute.reply.kind}): ${oneLine(dispute.reply.reason)}`,
-    `Defense evidence: ${oneLine(dispute.reply.evidence) || 'none given'}`,
+    '',
+    `Challenges against the claim (${group.items.length}), each with the defense:`,
+  ]
+  group.items.forEach((d, i) => {
+    const n = i + 1
+    lines.push(
+      `Challenge ${n}: ${oneLine(d.challenge.text)}`,
+      `Challenge ${n} evidence: ${oneLine(d.challenge.evidence)}`,
+      `Defense ${n} (${d.reply.kind}): ${oneLine(d.reply.reason)}`,
+      `Defense ${n} evidence: ${oneLine(d.reply.evidence) || 'none given'}`,
+    )
+  })
+  lines.push(
     '',
     'Check the evidence yourself where you can: re-run the test or read the source.',
-    'claimHolds: true only if the claim survives the challenge. checked: what you checked. note: one sentence on why.',
-  ].join('\n')
+    'claimHolds: true only if the claim survives every challenge. checked: what you checked. note: one sentence on why.',
+  )
+  return lines.join('\n')
 }
 
 function votePrompt(persona, dossierText, order) {
@@ -682,6 +710,15 @@ if (A.options) {
     baseline: mergedBaseline,
   }
 }
+if (described.options.length > MAX_OPTIONS) {
+  const w = A.options
+    ? `got ${described.options.length} fixed options; kept the first ${MAX_OPTIONS}`
+    : `merged ${described.options.length} options; kept the first ${MAX_OPTIONS}`
+  log(w)
+  warnings.push(w)
+  described = { ...described, options: described.options.slice(0, MAX_OPTIONS) }
+}
+// Unreachable while MAX_OPTIONS + 1 fits the label letters; kept for safety.
 if (described.options.length + 1 > LABEL_LETTERS.length) {
   const where = A.options ? 'too many fixed options' : 'too many options after the merge'
   return { stopped: `${where} (${described.options.length}); narrow the problem statement` }
@@ -771,20 +808,22 @@ if (classified.duplicates.length) {
   warnings.push(w)
 }
 
-// Blind rulings on every disputed claim. Every ruling is binding, so a missing one stops the run.
+// One blind ruling per disputed claim covers every challenge against it.
+// Every ruling is binding, so a missing one stops the run.
 phase('Rule')
-const rulingResults = await parallel(classified.disputes.map(d => () =>
-  agent(rulingPrompt(d, claimIndex[d.challenge.targetClaim]), cleanOpts({
-    label: `ruling:${d.id}`, phase: 'Rule', schema: RULING_SCHEMA, model: A.refereeModel,
+const disputeGroups = groupDisputes(classified.disputes)
+const rulingResults = await parallel(disputeGroups.map(g => () =>
+  agent(rulingPrompt(g, claimIndex[g.claim]), cleanOpts({
+    label: `ruling:${g.id}`, phase: 'Rule', schema: RULING_SCHEMA, model: A.refereeModel,
     isolation: advocateIsolation,
   }))))
 const rulings = []
-for (let i = 0; i < classified.disputes.length; i++) {
-  const d = classified.disputes[i]
+for (let i = 0; i < disputeGroups.length; i++) {
+  const g = disputeGroups[i]
   const r = rulingResults[i]
-  if (!r || typeof r.claimHolds !== 'boolean') return { stopped: `the ruling for ${d.id} failed; resume the run to retry it`, options }
+  if (!r || typeof r.claimHolds !== 'boolean') return { stopped: `the ruling for ${g.id} failed; resume the run to retry it`, options }
   rulings.push({
-    id: d.id, claim: d.challenge.targetClaim, against: d.challenge.against,
+    id: g.id, claim: g.claim, against: g.against,
     claimHolds: r.claimHolds, checked: r.checked, note: r.note,
   })
 }
