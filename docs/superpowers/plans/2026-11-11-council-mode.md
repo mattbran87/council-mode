@@ -1492,6 +1492,24 @@ test('a ballot whose reasons cite nothing is discarded', async () => {
   assert.equal(result.discarded[0].persona, 'Persona 1')
 })
 
+test('a run where every ballot is discarded stops instead of reporting a tie', async () => {
+  const base = fakeCouncil()
+  const respond = fakeCouncil({
+    vote: (key, prompt) => {
+      const b = base('vote:x', prompt)
+      return { ...b, reasons: b.reasons.map(r => ({ ...r, cites: [] })) }
+    },
+  })
+  const { result } = await runWorkflow({ args: ARGS, respond })
+  assert.match(result.stopped, /every ballot was discarded/)
+  assert.equal(result.discarded.length, 7)
+})
+
+test('the tally records how many voters counted', async () => {
+  const { result } = await runWorkflow({ args: ARGS, respond: fakeCouncil() })
+  assert.equal(result.result.voters, 7)
+})
+
 test('fixed options skip generation', async () => {
   const args = { ...ARGS, options: [{ description: 'alpha approach' }, { description: 'beta approach' }, { description: 'gamma approach' }], baseline: 'baseline: change nothing' }
   const { result, calls } = await runWorkflow({ args, respond: fakeCouncil() })
@@ -1639,6 +1657,9 @@ ballots.forEach((b, i) => {
   else discarded.push({ persona: nb.persona, problems: check.problems })
 })
 if (discarded.length) log(`${discarded.length} ballots discarded.`)
+if (!valid.length) {
+  return { stopped: 'every ballot was discarded, so there is no vote to tally', options, dossier, rejectedChallenges: rejected, discarded }
+}
 
 // Step 7: tally.
 return {
@@ -1655,15 +1676,19 @@ return {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [ ] **Step 5: Add `voters` to the tally result**
+
+In `tally` (helpers section), add `voters: rankings.length` to the returned object. In `tests/tally.test.mjs`, add `assert.equal(result.voters, 7)` to the center-squeeze test and `assert.equal(tally(L, []).voters, 0)` to the no-ballots test.
+
+- [ ] **Step 6: Run the tests**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add plugins/council-mode/skills/council/council.workflow.js tests/workflow.test.mjs tests/harness.test.mjs
+git add plugins/council-mode/skills/council/council.workflow.js tests/workflow.test.mjs tests/harness.test.mjs tests/tally.test.mjs
 git commit -m "feat: orchestrate generate, research, debate, vote, and tally"
 ```
 
