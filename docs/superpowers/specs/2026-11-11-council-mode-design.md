@@ -189,7 +189,7 @@ A close result means the options are near-equal; the report states this plainly.
 ## Implementation notes
 
 - **Skill + workflow split.** The skill runs step 1 (it needs the user) and step 8 (it groups similar flip conditions and hybrids, which needs judgment). The Workflow script runs steps 2–7. Code in the script does the tally, ballot validation, flip counts, and dossier, so those parts are deterministic and unit-tested.
-- **Advocates do not keep context across rounds.** Workflow agents start fresh on every call. Each debate prompt carries the advocate's own case instead. The agent-call count stays 11 + 3N plus 1 call per disputed claim.
+- **Advocates do not keep context across rounds.** Workflow agents start fresh on every call. Each debate prompt carries the advocate's own case instead. A run makes at most 12 + 3N agent calls (3 generators, 1 merge, N advocates, N challenge calls, 1 referee filter, N reply calls, 7 voters) plus 1 ruling call per disputed claim. The design discussion's "11 + 3N" left out the merge call.
 - **Referee calls.** The referee runs as 1 filter call plus 1 blind ruling call per disputed claim, all on the referee model.
 - **Randomness.** Workflow scripts cannot call `Math.random`. The skill passes a `seed`; the script uses a seeded generator for labels and per-voter order.
 - **Hybrid round.** The workflow accepts fixed `options` and `baseline` arguments, which skip step 2. The skill uses them for a second round with a hybrid.

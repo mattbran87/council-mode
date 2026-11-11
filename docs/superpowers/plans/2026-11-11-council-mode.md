@@ -2110,7 +2110,7 @@ A Claude Code plugin for decisions that are expensive to reverse and have 3 or m
 2. The workflow generates options, runs one advocate per option, holds a 2-round debate under a referee, and collects ranked ballots.
 3. Claude reports the winner, the pairwise table, the evidence that decided it, and what would change the result.
 
-A run starts 20 or more subagents. With 3 options plus the baseline, expect about 25 agent calls plus 1 per disputed claim.
+A run starts 20 or more subagents. With 3 options plus the baseline, expect up to 24 agent calls plus 1 per disputed claim.
 
 ## Develop
 
