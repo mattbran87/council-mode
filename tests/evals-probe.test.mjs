@@ -241,3 +241,10 @@ test('commitLabel: clean keeps the sha, dirty adds a content hash', () => {
   assert.notEqual(a, b)
   assert.equal(a, commitLabel('abc1234', true, 'one'))
 })
+
+test('formatReport names the rows\' script commit, not the first run\'s', async () => {
+  const { formatReport } = await import('../evals/report.mjs')
+  const rows = [{ key: 'a#1@new', scriptCommit: 'new', caseId: 'a', stage: 'ruling', kind: 'trap', status: 'scored', outcome: 'holds', pass: true, cost: 0.1 }]
+  const md = formatReport(rows, { runId: 'r', scriptCommit: 'old', budgetUsd: 5, spent: 0.1 })
+  assert.match(md, /Script commit new\./)
+})

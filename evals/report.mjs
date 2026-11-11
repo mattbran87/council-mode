@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // node evals/report.mjs --run-id <id>: prints the report and writes report.md into the run folder.
-import { writeFileSync } from 'node:fs'
+import { writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { score } from './lib/probe-core.mjs'
-import { openRun } from './lib/runstore.mjs'
+import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 
 function formatGroup(rows, run) {
   const s = score(rows)
@@ -40,7 +40,7 @@ function formatGroup(rows, run) {
 // Runs from different script commits are never mixed: one section per commit.
 export function formatReport(rows, run) {
   const commits = [...new Set(rows.map(r => r.scriptCommit).filter(Boolean))]
-  if (commits.length <= 1) return formatGroup(rows, run)
+  if (commits.length <= 1) return formatGroup(rows, { ...run, scriptCommit: commits[0] ?? run.scriptCommit })
   return commits.map(c => formatGroup(rows.filter(r => r.scriptCommit === c), { ...run, scriptCommit: c })).join('\n\n')
 }
 
@@ -48,9 +48,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const i = process.argv.indexOf('--run-id')
   const runId = i > 0 ? process.argv[i + 1] : null
   if (!runId) { console.error('usage: node evals/report.mjs --run-id <id>'); process.exit(2) }
+  // Check first: openRun creates the folder, and a mistyped id must not leave an empty run behind.
+  if (!existsSync(join(RUNS_ROOT, runId, 'run.json'))) { console.error(`no run named ${runId}`); process.exit(1) }
   const run = openRun(runId)
   const info = run.readRunInfo()
-  if (!info) { console.error(`no run named ${runId}`); process.exit(1) }
   const md = formatReport(run.latest(), { ...info, spent: run.spent() })
   writeFileSync(join(run.dir, 'report.md'), md)
   console.log(md)
