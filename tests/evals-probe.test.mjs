@@ -126,7 +126,7 @@ test('runClaude passes the prompt on stdin and reports a spawn failure', () => {
 import { mkdtempSync, readFileSync, existsSync as exists } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as pjoin } from 'node:path'
-import { runProbe } from '../evals/probe.mjs'
+import { runProbe, commitLabel } from '../evals/probe.mjs'
 import { formatReport } from '../evals/report.mjs'
 import { openRun } from '../evals/lib/runstore.mjs'
 
@@ -222,4 +222,22 @@ test('a reply with no structured output becomes an invalid row, not a failure', 
   assert.equal(res.stoppedBy, null)
   assert.equal(res.rows.length, 8)
   assert.ok(res.rows.every(r => r.status === 'invalid'))
+})
+
+test('commitLabel: clean keeps the sha, dirty adds a content hash', () => {
+  assert.equal(commitLabel('abc1234', false, 'x'), 'abc1234')
+  const a = commitLabel('abc1234', true, 'one')
+  const b = commitLabel('abc1234', true, 'two')
+  assert.match(a, /^abc1234\+[0-9a-f]{8}$/)
+  assert.notEqual(a, b)
+  assert.equal(a, commitLabel('abc1234', true, 'one'))
+})
+
+test('commitLabel: clean keeps the sha, dirty adds a content hash', () => {
+  assert.equal(commitLabel('abc1234', false, 'x'), 'abc1234')
+  const a = commitLabel('abc1234', true, 'one')
+  const b = commitLabel('abc1234', true, 'two')
+  assert.match(a, /^abc1234\+[0-9a-f]{8}$/)
+  assert.notEqual(a, b)
+  assert.equal(a, commitLabel('abc1234', true, 'one'))
 })

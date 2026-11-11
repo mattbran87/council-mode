@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // Layer 2: node evals/probe.mjs --run-id <id> [--budget-usd 5] [--repeats 3]
 import { spawnSync } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { loadCases, validateCase, buildPrompt, STAGES, checkShape, outcome, passed, score } from './lib/probe-core.mjs'
 import { runClaude, claudeArgv, PER_CALL_CAP_USD } from './lib/claude.mjs'
 import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
@@ -9,9 +12,23 @@ import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 const MIN_CALL_USD = 0.01
 const MAX_FAILURE_STREAK = 3
 
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const SCRIPT_REL = 'plugins/council-mode/skills/council/council.workflow.js'
+
+// Uncommitted edits to the script keep the same sha, so a dirty file adds a content hash;
+// otherwise a rerun would reuse rows scored against the old prompts.
+export function commitLabel(sha, dirty, content) {
+  if (!dirty) return sha
+  return `${sha}+${createHash('sha256').update(content).digest('hex').slice(0, 8)}`
+}
+
 export function scriptCommit() {
-  const r = spawnSync('git', ['log', '-1', '--format=%h', '--', 'plugins/council-mode/skills/council/council.workflow.js'], { encoding: 'utf8' })
-  return (r.stdout || '').trim() || 'unknown'
+  const git = args => spawnSync('git', args, { encoding: 'utf8', cwd: REPO_ROOT })
+  const sha = (git(['log', '-1', '--format=%h', '--', SCRIPT_REL]).stdout || '').trim() || 'unknown'
+  const dirty = (git(['status', '--porcelain', '--', SCRIPT_REL]).stdout || '').trim() !== ''
+  let content = ''
+  if (dirty) { try { content = readFileSync(join(REPO_ROOT, SCRIPT_REL)) } catch { /* label from sha alone */ } }
+  return commitLabel(sha, dirty, content)
 }
 
 export function runProbe({ runId, budgetUsd = 5, repeats = 3, root = RUNS_ROOT, runner, argv0 = claudeArgv(), scriptCommit: commit = scriptCommit(), cases = loadCases() }) {
@@ -61,7 +78,11 @@ function arg(name, fallback) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runId = arg('run-id')
   if (!runId) { console.error('usage: node evals/probe.mjs --run-id <id> [--budget-usd 5] [--repeats 3]'); process.exit(2) }
-  const res = runProbe({ runId, budgetUsd: Number(arg('budget-usd', 5)), repeats: Number(arg('repeats', 3)) })
+  const usage = 'usage: node evals/probe.mjs --run-id <id> [--budget-usd 5] [--repeats 3]'
+  const budgetUsd = Number(arg('budget-usd', 5))
+  const repeats = Number(arg('repeats', 3))
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0 || !Number.isInteger(repeats) || repeats < 1) { console.error(usage); process.exit(2) }
+  const res = runProbe({ runId, budgetUsd, repeats })
   const { formatReport } = await import('./report.mjs')
   console.log(formatReport(res.rows, res.run))
   if (res.stoppedBy === 'no-claude') { console.error('claude is not on the PATH. Install Claude Code or fix PATH, then rerun.'); process.exit(1) }
