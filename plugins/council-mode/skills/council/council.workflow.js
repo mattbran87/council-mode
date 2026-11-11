@@ -193,29 +193,42 @@ function dossierIds(dossier) {
   return ids
 }
 
+function oneLine(s) { return String(s ?? '').replace(/\s+/g, ' ').trim() }
+
 function section(title, items) {
   return [title, ...(items.length ? items : ['- none']), '']
+}
+
+// Order entries by the position of the owning option (label = part of the claim ID before the first '-'). Stable.
+function byOrder(order, items, claimOf) {
+  const rank = x => {
+    const i = order.indexOf(String(claimOf(x)).split('-')[0])
+    return i < 0 ? order.length : i
+  }
+  return items.map((x, i) => [x, i]).sort((p, q) => rank(p[0]) - rank(q[0]) || p[1] - q[1]).map(p => p[0])
 }
 
 function renderDossier(dossier, order) {
   const lines = ['## Problem', dossier.problem, '']
   for (const label of order) {
     const o = dossier.options.find(x => x.label === label)
-    lines.push(`### Option ${o.label}`, o.description, '')
+    lines.push(`### Option ${o.label}`, oneLine(o.description), '')
     for (const c of o.claims) {
-      lines.push(`- ${c.id} [${c.evidence}] ${c.text}${c.source ? ` (${c.source})` : ''}; confidence ${c.confidence}; ${c.status}`)
+      lines.push(`- ${c.id} [${c.evidence}] ${oneLine(c.text)}${c.source ? ` (${oneLine(c.source)})` : ''}; confidence ${c.confidence}; ${c.status}`)
     }
-    for (const w of o.weaknesses) lines.push(`- ${w.id} weakness: ${w.text}`)
-    lines.push(`- Failed tests: ${o.failedTests.length ? o.failedTests.join('; ') : 'none'}`, '')
+    for (const w of o.weaknesses) lines.push(`- ${w.id} weakness: ${oneLine(w.text)}`)
+    lines.push(`- Failed tests: ${o.failedTests.length ? o.failedTests.map(oneLine).join('; ') : 'none'}`, '')
   }
-  lines.push(...section('## Referee rulings', dossier.rulings.map(r =>
-    `- ${r.id} on ${r.claim}: ${r.claimHolds ? 'claim holds' : 'claim false'}. Checked: ${r.checked}. ${r.note}`)))
-  lines.push(...section('## Concessions', dossier.concessions.map(x =>
-    `- ${x.id} ${x.challenge.targetClaim} conceded. Evidence: ${x.evidence}`)))
-  lines.push(...section('## Voided concessions (no evidence given, so the claim stands)', dossier.voided.map(v =>
-    `- ${v.challenge.targetClaim}`)))
-  lines.push(...section('## Unanswered challenges', dossier.unanswered.map(u =>
-    `- ${u.id} against ${u.challenge.targetClaim}: ${u.challenge.text} (evidence: ${u.challenge.evidence})`)))
+  lines.push(...section('## Referee rulings', byOrder(order, dossier.rulings, r => r.claim).map(r =>
+    `- ${r.id} on ${r.claim}: ${r.claimHolds ? 'claim holds' : 'claim false'}. Checked: ${oneLine(r.checked)}. ${oneLine(r.note)}`)))
+  lines.push(...section('## Concessions', byOrder(order, dossier.concessions, x => x.challenge.targetClaim).map(x =>
+    `- ${x.id} ${x.challenge.targetClaim} conceded. Evidence: ${oneLine(x.evidence)}`)))
+  lines.push(...section('## Voided concessions (no evidence given, so the claim stands)',
+    byOrder(order, dossier.voided, v => v.challenge.targetClaim).map(v => `- ${v.challenge.targetClaim}`)))
+  lines.push(...section('## Unanswered challenges', byOrder(order, dossier.unanswered, u => u.challenge.targetClaim).map(u =>
+    `- ${u.id} against ${u.challenge.targetClaim}: ${oneLine(u.challenge.text)} (evidence: ${oneLine(u.challenge.evidence)})`)))
+  lines.push(...section('## Unexplained confidence drops', byOrder(order, dossier.drops, d => d.claim).map(d =>
+    `- ${d.claim}: ${d.from} to ${d.to}, no evidence given`)))
   lines.push(...section('## Flip counts', order.map(label => {
     const f = dossier.flips.find(x => x.label === label)
     const warn = f.warnings.length ? `; warning: ${f.warnings.join(', ')}` : ''
