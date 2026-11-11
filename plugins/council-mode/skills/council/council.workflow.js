@@ -153,6 +153,77 @@ function flipStats(labels, challenges, classified, rulings, thresholds) {
   })
 }
 
+function buildDossier({ problem, options, cases, classified, rulings, flips }) {
+  const struck = new Set(rulings.filter(r => !r.claimHolds).map(r => r.claim))
+  const conceded = new Set(classified.concessions.map(x => x.challenge.targetClaim))
+  return {
+    problem,
+    options: options.map(o => {
+      const c = cases.find(k => k.label === o.label)
+      return {
+        label: o.label,
+        description: o.description,
+        claims: c.claims.map(cl => ({
+          ...cl,
+          status: struck.has(cl.id) ? 'struck' : conceded.has(cl.id) ? 'conceded' : 'stands',
+        })),
+        weaknesses: c.weaknesses,
+        failedTests: c.failedTests,
+      }
+    }),
+    rulings,
+    concessions: classified.concessions,
+    voided: classified.voided,
+    unanswered: classified.unanswered,
+    drops: classified.drops,
+    flips,
+  }
+}
+
+// IDs a ballot reason may cite. A bare option label is not evidence, so it is not in the set.
+function dossierIds(dossier) {
+  const ids = new Set()
+  for (const o of dossier.options) {
+    for (const c of o.claims) ids.add(c.id)
+    for (const w of o.weaknesses) ids.add(w.id)
+  }
+  for (const r of dossier.rulings) ids.add(r.id)
+  for (const x of dossier.concessions) ids.add(x.id)
+  for (const u of dossier.unanswered) ids.add(u.id)
+  return ids
+}
+
+function section(title, items) {
+  return [title, ...(items.length ? items : ['- none']), '']
+}
+
+function renderDossier(dossier, order) {
+  const lines = ['## Problem', dossier.problem, '']
+  for (const label of order) {
+    const o = dossier.options.find(x => x.label === label)
+    lines.push(`### Option ${o.label}`, o.description, '')
+    for (const c of o.claims) {
+      lines.push(`- ${c.id} [${c.evidence}] ${c.text}${c.source ? ` (${c.source})` : ''}; confidence ${c.confidence}; ${c.status}`)
+    }
+    for (const w of o.weaknesses) lines.push(`- ${w.id} weakness: ${w.text}`)
+    lines.push(`- Failed tests: ${o.failedTests.length ? o.failedTests.join('; ') : 'none'}`, '')
+  }
+  lines.push(...section('## Referee rulings', dossier.rulings.map(r =>
+    `- ${r.id} on ${r.claim}: ${r.claimHolds ? 'claim holds' : 'claim false'}. Checked: ${r.checked}. ${r.note}`)))
+  lines.push(...section('## Concessions', dossier.concessions.map(x =>
+    `- ${x.id} ${x.challenge.targetClaim} conceded. Evidence: ${x.evidence}`)))
+  lines.push(...section('## Voided concessions (no evidence given, so the claim stands)', dossier.voided.map(v =>
+    `- ${v.challenge.targetClaim}`)))
+  lines.push(...section('## Unanswered challenges', dossier.unanswered.map(u =>
+    `- ${u.id} against ${u.challenge.targetClaim}: ${u.challenge.text} (evidence: ${u.challenge.evidence})`)))
+  lines.push(...section('## Flip counts', order.map(label => {
+    const f = dossier.flips.find(x => x.label === label)
+    const warn = f.warnings.length ? `; warning: ${f.warnings.join(', ')}` : ''
+    return `- Option ${f.label}: conceded ${f.conceded} of ${f.challenged} challenges; ${f.adverse} adverse rulings${warn}`
+  })))
+  return lines.join('\n')
+}
+
 // --- pure helpers end
 
 return { stopped: 'orchestration not implemented yet' }
