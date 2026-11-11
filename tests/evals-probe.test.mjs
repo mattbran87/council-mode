@@ -87,3 +87,38 @@ test('score gives per-stage shares and passes a stage only at 5 of 6 or better',
   assert.equal(s.ruling.pass, false)
   assert.equal(s.reply.pass, false)
 })
+
+import { buildArgs, parseOutput, runClaude, PER_CALL_CAP_USD } from '../evals/lib/claude.mjs'
+
+test('buildArgs sends model, budget, schema, and web tools only', () => {
+  const a = buildArgs({ model: 'opus', schema: { type: 'object' }, budgetUsd: 0.25 })
+  assert.deepEqual(a.slice(0, 3), ['-p', '--output-format', 'json'])
+  assert.equal(a[a.indexOf('--model') + 1], 'opus')
+  assert.equal(a[a.indexOf('--max-budget-usd') + 1], '0.2500')
+  assert.equal(a[a.indexOf('--json-schema') + 1], '{"type":"object"}')
+  assert.equal(a[a.indexOf('--tools') + 1], 'WebSearch,WebFetch')
+})
+
+test('parseOutput reads structured output, cost, and errors', () => {
+  const ok = parseOutput(JSON.stringify({ is_error: false, total_cost_usd: 0.02, duration_ms: 900, structured_output: { claimHolds: true } }))
+  assert.deepEqual(ok, { ok: true, output: { claimHolds: true }, cost: 0.02, durationMs: 900 })
+  const err = parseOutput(JSON.stringify({ is_error: true, result: 'budget exceeded', total_cost_usd: 0.5 }))
+  assert.equal(err.ok, false)
+  assert.match(err.error, /budget exceeded/)
+  assert.equal(parseOutput('not json').ok, false)
+  const noStruct = parseOutput(JSON.stringify({ is_error: false, total_cost_usd: 0.01, result: '{"claimHolds":false,"checked":"x","note":"y"}' }))
+  assert.deepEqual(noStruct.output, { claimHolds: false, checked: 'x', note: 'y' })
+})
+
+test('runClaude passes the prompt on stdin and reports a spawn failure', () => {
+  let seen
+  const runner = (cmd, args, opts) => { seen = { cmd, args, opts }; return { status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, structured_output: { ok: true } }), stderr: '' } }
+  const r = runClaude({ prompt: 'hello', model: 'haiku', schema: {}, budgetUsd: 0.1, runner, argv0: ['claude'] })
+  assert.equal(r.ok, true)
+  assert.equal(seen.opts.input, 'hello')
+  assert.equal(seen.cmd, 'claude')
+  const dead = runClaude({ prompt: 'x', model: 'haiku', schema: {}, budgetUsd: 0.1, runner: () => ({ error: new Error('ETIMEDOUT') }), argv0: ['claude'] })
+  assert.equal(dead.ok, false)
+  assert.match(dead.error, /ETIMEDOUT/)
+  assert.equal(PER_CALL_CAP_USD, 0.5)
+})
