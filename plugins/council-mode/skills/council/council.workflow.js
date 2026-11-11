@@ -296,6 +296,56 @@ function citationCounts(ballots, ids) {
     .map(([id, voters]) => ({ id, voters }))
 }
 
+function pairwiseTable(labels, rankings) {
+  const m = {}
+  for (const a of labels) {
+    m[a] = {}
+    for (const b of labels) m[a][b] = 0
+  }
+  for (const r of rankings) {
+    for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) m[r[i]][r[j]]++
+  }
+  return m
+}
+
+function condorcetWinner(labels, m) {
+  return labels.find(a => labels.every(b => a === b || m[a][b] > m[b][a])) || null
+}
+
+// Last place = 0 points, each place up = 1 more point.
+function bordaScores(labels, rankings) {
+  const scores = {}
+  for (const l of labels) scores[l] = 0
+  for (const r of rankings) r.forEach((l, i) => { scores[l] += r.length - 1 - i })
+  return scores
+}
+
+// Instant runoff is not used: with few voters it drops a compromise every voter ranks second.
+function tally(labels, ballots) {
+  const rankings = ballots.map(b => b.ranking)
+  const pairwise = pairwiseTable(labels, rankings)
+  const borda = bordaScores(labels, rankings)
+  let method
+  let winner = condorcetWinner(labels, pairwise)
+  let tied = []
+  if (winner) {
+    method = 'condorcet'
+  } else {
+    const top = Math.max(...labels.map(l => borda[l]))
+    tied = labels.filter(l => borda[l] === top)
+    if (tied.length === 1) {
+      method = 'borda'
+      winner = tied[0]
+      tied = []
+    } else {
+      method = 'tie'
+      winner = null
+    }
+  }
+  const unacceptableVotes = winner ? ballots.filter(b => (b.unacceptable || []).includes(winner)).length : 0
+  return { method, winner, tied, pairwise, borda, fragile: unacceptableVotes >= 2, unacceptableVotes }
+}
+
 // --- pure helpers end
 
 return { stopped: 'orchestration not implemented yet' }
