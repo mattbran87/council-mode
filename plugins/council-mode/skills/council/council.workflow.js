@@ -645,7 +645,11 @@ const describeOf = o => (typeof o === 'string' ? o : o && o.description)
 // Step 2: generate, or take fixed options for a hybrid round.
 let described
 if (A.options) {
-  described = { options: A.options, baseline: describeOf(A.baseline) || 'Change nothing.' }
+  const fixed = A.options.map(describeOf)
+  const baselineGiven = A.baseline !== undefined && A.baseline !== null
+  const fixedBaseline = baselineGiven ? describeOf(A.baseline) : 'Change nothing.'
+  if ([...fixed, fixedBaseline].some(d => !String(d ?? '').trim())) throw new Error('every fixed option needs a description')
+  described = { options: fixed, baseline: fixedBaseline }
 } else {
   phase('Generate')
   const generated = (await parallel([1, 2, 3].map(n => () =>

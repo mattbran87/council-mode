@@ -312,6 +312,16 @@ test('fixed options may be plain strings', async () => {
   assert.equal(result.options.find(o => o.baseline).description, 'baseline: change nothing')
 })
 
+test('fixed options or a baseline without a description throw before any agent runs', async () => {
+  const labels = []
+  const respond = l => { labels.push(l); return null }
+  const good = ['alpha approach', 'beta approach', 'gamma approach']
+  await assert.rejects(runWorkflow({ args: { ...ARGS, options: [...good.slice(0, 2), { text: 'gamma' }] }, respond }), /every fixed option needs a description/)
+  await assert.rejects(runWorkflow({ args: { ...ARGS, options: [...good.slice(0, 2), '  '] }, respond }), /every fixed option needs a description/)
+  await assert.rejects(runWorkflow({ args: { ...ARGS, options: good, baseline: '' }, respond }), /every fixed option needs a description/)
+  assert.equal(labels.length, 0)
+})
+
 test('more merged options than labels stops the run', async () => {
   const many = Array.from({ length: 17 }, (_, i) => ({ description: `option ${i}` }))
   const respond = fakeCouncil({ merge: () => ({ options: many, baseline: 'nothing' }) })
