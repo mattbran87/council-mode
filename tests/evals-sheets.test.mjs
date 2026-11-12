@@ -108,3 +108,53 @@ test('formatSheetReport shows the version table, the differences, and the sample
   assert.match(md, /S1: adherence -0\.50/)
   assert.match(md, /at most 21 ballots/)
 })
+
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as pjoin } from 'node:path'
+import { runSheetTest, SHEETS_FIXTURE_DIR } from '../evals/sheets.mjs'
+import { loadFixture } from '../evals/lib/fixture.mjs'
+import { H } from '../evals/lib/helpers.mjs'
+
+const fx = loadFixture(SHEETS_FIXTURE_DIR)
+const anId = [...H.dossierIds(fx.run.dossier)].find(id => /-C\d+$/.test(id))
+const tmpRoot = () => mkdtempSync(pjoin(tmpdir(), 'cm-sheets-'))
+
+// Votes in the shown order citing a real claim; the judge ties every reason to cares4.
+const fakeModel = (cmd, args, opts) => {
+  const schema = JSON.parse(args[args.indexOf('--json-schema') + 1])
+  let out
+  if (schema.properties.ranking) {
+    const labels = opts.input.match(/Labels: ([A-Z, ]+)\./)[1].split(', ')
+    out = { ranking: labels, reasons: labels.slice(1).map((lower, i) => ({ higher: labels[i], lower, reason: 'r', cites: [anId] })), flipCondition: 'x', unacceptable: [], hybrid: '' }
+  } else {
+    const n = (opts.input.match(/^\d+\. /gm) || []).length
+    out = { reasons: Array.from({ length: n }, (_, index) => ({ index, serves: 'cares4', note: '' })), rejectsViolations: [] }
+  }
+  return { status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, duration_ms: 10, structured_output: out }), stderr: '' }
+}
+
+const base = { scriptCommit: 'abc', argv0: ['claude'], budgetUsd: 15 }
+
+test('runSheetTest runs 5 versions, judges against the 5-item reference, and scores adherence per version', () => {
+  const prompts = []
+  const runner = (cmd, args, opts) => { prompts.push(opts.input); return fakeModel(cmd, args, opts) }
+  const res = runSheetTest({ ...base, runId: 's1', repeats: 1, root: tmpRoot(), runner })
+  assert.equal(prompts.length, 7 * 5 * 2)
+  const judgePrompts = prompts.filter(p => p.startsWith("You check whether a voter's ballot"))
+  assert.equal(judgePrompts.length, 35)
+  assert.ok(judgePrompts.every(p => /cares5: /.test(p) && !/S[0-4]\b/.test(p)))
+  // cares4 is in S4's sheet only.
+  assert.equal(res.summary.byVersion.S4.adherence, 1)
+  assert.equal(res.summary.byVersion.S0.adherence, 0)
+  assert.equal(res.summary.byVersion.S0.coverage, 1)
+  assert.equal(res.stoppedBy, null)
+})
+
+test('the sheet-test voter prompts carry each variant sheet', () => {
+  const prompts = []
+  runSheetTest({ ...base, runId: 's2', repeats: 1, root: tmpRoot(), runner: (c, a, o) => { prompts.push(o.input); return fakeModel(c, a, o) } })
+  const votes = prompts.filter(p => p.startsWith('You are a voter'))
+  assert.equal(votes.filter(p => p.includes('in no particular order')).length, 7)
+  assert.equal(votes.filter(p => !p.includes('Rejects:')).length, 7)
+})
