@@ -1,11 +1,12 @@
 # Council Mode evals
 
-Two layers check that Council Mode does what its design claims. Design: `docs/superpowers/specs/2026-11-11-council-mode-evals-design.md`.
+Two layers check that Council Mode does what its design claims, and the persona test compares voter identity blocks. Design: `docs/superpowers/specs/2026-11-11-council-mode-evals-design.md`.
 
 | Layer | Command | Cost |
 | --- | --- | --- |
 | 1. Invariant checks on saved runs | `node evals/invariants.mjs [fixture dir ...]` | Free |
 | 2. Fake-evidence probe | `node evals/probe.mjs --run-id <id> --budget-usd 5` | 30 model calls (10 cases, 3 attempts each) |
+| Persona test | `node evals/persona.mjs --run-id <id> --budget-usd 10` | 63 voter calls and up to 63 judge calls |
 
 ## Layer 1
 
@@ -82,6 +83,48 @@ To print the report again and write `report.md` in the run folder:
 ```
 node evals/report.mjs --run-id <id>
 ```
+
+## Persona test
+
+The persona test checks whether the voter's identity block changes how a voter ranks the same dossier. Design: `docs/superpowers/specs/2026-11-12-council-mode-persona-test-design.md`.
+
+| Version | Identity block |
+| --- | --- |
+| v1 | Name plus a short description of the person. No stated priorities. |
+| v2 | Name plus criteria sheet. This is the production prompt. |
+| v3 | Criteria sheet with no name. |
+
+Only the identity block changes. The rest of the prompt comes from the production `votePrompt`.
+
+Run it:
+
+```bash
+node evals/persona.mjs --run-id 2026-11-12-persona1 --budget-usd 10
+```
+
+Options:
+
+- `--budget-usd`: the dollar cap for the run. The default is 10.
+- `--repeats`: the attempts per voter and version. The default is 3.
+
+What a run does:
+
+1. It renders the dossier of `fixtures/2026-11-11-cli-language/` once per voter, in that voter's seeded option order. The order is the same for every version and repeat.
+2. It runs 7 voters × 3 versions × the repeats as voter calls. Each call uses the voter's model from `persona-voters.json`, runs in safe mode, and has no tools.
+3. It checks each ballot with the production `normalizeBallot` and `validateBallot`. An invalid ballot is counted and never judged.
+4. It runs one opus judge call per valid ballot. The judge sees the voter's criteria sheet and the ballot. It never sees the version or the voter's name.
+
+The measures:
+
+- **Tied share:** reasons that the judge tied to one of the voter's criteria, divided by all reasons.
+- **Top criterion used:** at least one reason serves the voter's first "Cares about" item.
+- **Rejects violations:** adjacent pairs where the higher option breaks the voter's "Rejects" line.
+- **Same winner:** how many repeats pick the most common first choice.
+- **Ranking spread:** the mean count of option pairs in a different order between 2 repeats.
+
+The decision rule: version A beats version B when A's tied share is at least 0.10 higher and A's ranking spread is not higher. Each version has at most 21 ballots, so only large differences show.
+
+Run handling matches the probe: results go to `~/.claude/council-mode-evals/<run-id>/`, and the run stops at the budget cap or after 3 failed calls in a row. If you rerun the same run id, finished calls are skipped. A finished run therefore re-prints its report and rewrites `report.md` without new calls. If you edit `votePrompt` or `persona-voters.json`, the calls run again under a new script label.
 
 ## The findings loop
 
