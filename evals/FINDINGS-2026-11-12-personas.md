@@ -37,3 +37,38 @@ Verdicts under the decision rule: v2 beats v1; v3 beats v1. v2 and v3 tie: v3's 
 1. **7-language follow-up.** Run the follow-up on a scenario where the winners can change: Python, Rust, C#, C++, Go, Ruby, and JavaScript, on a neutral team.
 2. **v2 against v3.** If the follow-up still leaves them tied, rerun only v2 and v3 with 5 repeats to settle whether the name steadies the vote.
 3. **Generalize the test.** Make the persona test take any fixture and voters file. Today it is fixed to the first fixture.
+
+# Follow-up: 5-language scenario, 2026-11-12
+
+The follow-up council run (`wf_f85173db-8a6`, saved as `fixtures/2026-11-12-cli-5lang/`) compared Python, Rust, Go, C#, and JavaScript on a mixed-skill team. Shell scripts were the baseline. Go won by Condorcet (Borda 33, against 22 for C#), using 45 agents and about 2.1M tokens.
+
+The persona test then ran on that dossier as run `2026-11-12-persona-5lang`, under script label `1a8ce56/20dd0e31/2026-11-12-cli-5lang`. It made 63 voter calls and 63 judge calls: 0 failed and 0 invalid. It spent $4.79 ($2.58 on voters, $2.21 on the judge).
+
+## Score table, both scenarios
+
+| Version | Tied share | Top criterion used | Same winner (of 3) | Ranking spread | Distinct first choices | Top first-choice share |
+| --- | --- | --- | --- | --- | --- | --- |
+| v1, pilot / follow-up | 0.60 / 0.53 | 0.76 / 0.90 | 2.71 / 2.86 | 0.76 / 0.95 | 4 / 2 | 0.52 / 0.95 |
+| v2, pilot / follow-up | 0.85 / 0.93 | 0.86 / 1.00 | 3.00 / 2.71 | 0.38 / 0.76 | 3 / 4 | 0.43 / 0.71 |
+| v3, pilot / follow-up | 0.89 / 0.91 | 0.95 / 0.95 | 2.57 / 2.86 | 0.76 / 0.95 | 4 / 3 | 0.48 / 0.76 |
+
+The verdicts were the same in both runs: v2 beats v1, v3 beats v1, and v2 and v3 tie.
+
+## Conclusion
+
+- **The preference list is what matters.** Across 2 scenarios, a criteria sheet kept about 0.85–0.93 of reasons on the voter's own priorities. A described persona kept 0.53–0.60.
+- **A described persona herds.** When the scenario had a clear favorite, 20 of 21 v1 ballots picked it (Go). With criteria, stakeholders split where their priorities say they should: the platform maintainer picked JavaScript, the engineering manager leaned C#, and the support lead leaned Rust under v3. The pilot showed no herding, because its panel split between 2 C# options under every version.
+- **The name adds no faithfulness.** v2 and v3 were within 0.04 in both runs. v2 had the lowest ranking spread in both runs, but its same-winner lead in the pilot did not repeat.
+- **Decision.** Production keeps v2 (name plus criteria). The criteria sheet is the part to protect: step 1 of the skill must keep writing explicit "Cares about", "Accepts", and "Rejects" lines from the stakeholders.
+
+## Limits
+
+- The judge scores v1 against a criteria sheet v1 never saw, so v1 faithfulness means "recovered the stated priorities".
+- The shared prompt tail says "by your criteria" in every version, including v1.
+- 21 ballots per version per scenario; rejects-violation counts are too noisy to rank versions.
+- v1's stability is inflated by herding: a voter that always picks the favorite always repeats its winner.
+
+## What to improve next
+
+1. A neutral prompt tail for v1 ("Rank every option"), if the persona test is rerun.
+2. v2 against v3 with 5 repeats, only if a shorter voter prompt becomes worth having.
