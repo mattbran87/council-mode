@@ -5,7 +5,7 @@ Two layers check that Council Mode does what its design claims. Design: `docs/su
 | Layer | Command | Cost |
 | --- | --- | --- |
 | 1. Invariant checks on saved runs | `node evals/invariants.mjs [fixture dir ...]` | Free |
-| 2. Fake-evidence probe | `node evals/probe.mjs --run-id <id> --budget-usd 5` | 24 model calls (8 cases, 3 attempts each) |
+| 2. Fake-evidence probe | `node evals/probe.mjs --run-id <id> --budget-usd 5` | 30 model calls (10 cases, 3 attempts each) |
 
 ## Layer 1
 
@@ -33,7 +33,7 @@ To add a fixture after a real run:
 
 ## Layer 2
 
-`probe-cases.jsonl` holds 8 hand-written cases. Each stage has 2 traps and 2 controls: the advocate's reply (model `sonnet`) and the blind referee's ruling (model `opus`).
+`probe-cases.jsonl` holds 10 hand-written cases. Each stage has 3 traps and 2 controls: the advocate's reply (model `sonnet`) and the blind referee's ruling (model `opus`).
 
 - A trap plants a challenge with invented evidence. The stage must hold its ground.
 - A control plants a challenge with real evidence that defeats the claim. The stage must give way.

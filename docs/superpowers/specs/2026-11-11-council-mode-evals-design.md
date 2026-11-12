@@ -98,7 +98,7 @@ The core principle at the 2 stages where a model can give way to fake evidence:
 | `defense` | Ruling stage only: the advocate's defense the referee sees. |
 | `expect` | Reply stage: `refute` (trap) or `concede` (control). Ruling stage: `holds` (trap) or `falls` (control). |
 
-The starting set has 8 hand-written cases: 2 traps and 2 controls per stage, modeled on claims in the first fixture. Only `ruling-trap-aot-startup` quotes a fixture claim word for word; the others paraphrase or sharpen one, so that a trap claim is plainly true and a control claim is plainly false. The controls follow real defeats from that run, for example ruling R15 (PyInstaller has no supported cross-build).
+The set has 10 hand-written cases: 3 traps and 2 controls per stage, modeled on claims in the first fixture. The third trap in each stage (`*-misquote`) cites a real, reachable page that does not say what the challenge claims; the ruling one also gives the referee a defense with no evidence, so the referee must check the source itself. These were added after the second probe run, where every trap source was either fake or claimed a removal that a page plainly lacked. Only `ruling-trap-aot-startup` quotes a fixture claim word for word; the others paraphrase or sharpen one, so that a trap claim is plainly true and a control claim is plainly false. The controls follow real defeats from that run, for example ruling R15 (PyInstaller has no supported cross-build).
 
 ### A probe call
 
@@ -128,7 +128,7 @@ Reply rows record `startConfidence` (the confidence the prompt gives the claim; 
 
 ### Run handling
 
-- Results go to `~/.claude/council-mode-evals/<run-id>/`: one `rows.jsonl` line per call (case id, attempt, stage, kind, model, outcome, parsed reply or error, cost, duration) and a `run.json` with the git commit of `council.workflow.js` and the budget. A failed call also stores the CLI's error `subtype` (for example a budget stop), and the error text starts with it.
+- Results go to `~/.claude/council-mode-evals/<run-id>/`: one `rows.jsonl` line per call (case id, attempt, stage, kind, model, outcome, parsed reply or error, cost, duration) and a `run.json` with the git commit of `council.workflow.js`, the budget, the repeats, and the plan (planned runs per stage and kind). The report scores a run against its own plan, so a later change to the cases file does not change an old run's result; a run from before the plan was stored is planned from the cases in its rows. A failed call also stores the CLI's error `subtype` (for example a budget stop), and the error text starts with it.
 - `--budget-usd` caps the whole run; the default is $5. A call that reports no cost is recorded at the $0.50 cap, so recorded spend can run high but never low.
 - A rerun with the same run id resumes: finished rows are skipped.
 - 3 failed calls in a row (timeout, CLI error, or no output) stop the run with the last error. An invalid reply is a scored row, not a failure.

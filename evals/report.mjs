@@ -3,7 +3,7 @@
 import { writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { score, planFor, loadCases, newConfidence } from './lib/probe-core.mjs'
+import { score, planFor, newConfidence } from './lib/probe-core.mjs'
 import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 
 // A reply partial shows the confidence change: "partial 85→78", or "partial →78" on rows saved before startConfidence.
@@ -14,8 +14,15 @@ function outcomeLabel(r) {
   return `partial ${r.startConfidence ?? ''}→${now}`
 }
 
+// Runs from before run.json held a plan: count the cases that appear in the rows.
+function planOf(rows, run) {
+  if (run.plan) return run.plan
+  const seen = new Map(rows.map(r => [r.caseId, { stage: r.stage, kind: r.kind }]))
+  return planFor([...seen.values()], Number.isInteger(run.repeats) && run.repeats > 0 ? run.repeats : 3)
+}
+
 function formatGroup(rows, run) {
-  const s = score(rows, planFor(loadCases(), Number.isInteger(run.repeats) && run.repeats > 0 ? run.repeats : 3))
+  const s = score(rows, planOf(rows, run))
   const share = x => `${x.passed}/${x.valid}`
   const lines = [
     `# Probe run ${run.runId}`,

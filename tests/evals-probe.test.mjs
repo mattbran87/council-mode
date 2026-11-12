@@ -4,16 +4,16 @@ import { loadCases, validateCase } from '../evals/lib/probe-core.mjs'
 
 test('every probe case is valid', () => {
   const cases = loadCases()
-  assert.equal(cases.length, 8)
+  assert.equal(cases.length, 10)
   for (const c of cases) assert.deepEqual(validateCase(c), [], c.id)
 })
 
-test('the cases hold 2 traps and 2 controls per stage, with unique IDs', () => {
+test('the cases hold 3 traps and 2 controls per stage, with unique IDs', () => {
   const cases = loadCases()
   assert.equal(new Set(cases.map(c => c.id)).size, cases.length)
   for (const stage of ['reply', 'ruling']) {
     for (const kind of ['trap', 'control']) {
-      assert.equal(cases.filter(c => c.stage === stage && c.kind === kind).length, 2, `${stage}/${kind}`)
+      assert.equal(cases.filter(c => c.stage === stage && c.kind === kind).length, kind === 'trap' ? 3 : 2, `${stage}/${kind}`)
     }
   }
 })
@@ -27,6 +27,8 @@ test('validateCase reports each problem', () => {
 import { buildPrompt, STAGES, checkShape, outcome, passed, score, planFor, newConfidence } from '../evals/lib/probe-core.mjs'
 
 const byId = id => loadCases().find(c => c.id === id)
+// The runner tests use the first 8 cases, which the fake model knows how to answer.
+const CORE = loadCases().slice(0, 8)
 
 test('ruling prompts use the production builder and stay blind', () => {
   const p = buildPrompt(byId('ruling-trap-aot-startup'))
@@ -78,8 +80,8 @@ const scoredRows = (stage, kind, n, passN) => Array.from({ length: n }, (_, i) =
 
 test('planFor counts cases of each stage and kind times repeats', () => {
   const plan = planFor(loadCases(), 3)
-  assert.deepEqual(plan, { reply: { trap: 6, control: 6 }, ruling: { trap: 6, control: 6 } })
-  assert.deepEqual(planFor(loadCases(), 1).reply, { trap: 2, control: 2 })
+  assert.deepEqual(plan, { reply: { trap: 9, control: 6 }, ruling: { trap: 9, control: 6 } })
+  assert.deepEqual(planFor(loadCases(), 1).reply, { trap: 3, control: 2 })
 })
 
 test('score gives per-stage shares, a result, and a confidence', () => {
@@ -185,7 +187,7 @@ const tmpRoot = () => mkdtempSync(pjoin(tmpdir(), 'cm-runs-'))
 
 test('runProbe scores all cases 3 times and the report shows both stages passing', () => {
   const root = tmpRoot()
-  const res = runProbe({ runId: 't1', budgetUsd: 5, repeats: 3, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'abc1234' })
+  const res = runProbe({ cases: CORE, runId: 't1', budgetUsd: 5, repeats: 3, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'abc1234' })
   assert.equal(res.rows.length, 24)
   assert.equal(res.score.reply.result, 'PASS')
   assert.equal(res.score.ruling.result, 'PASS')
@@ -197,10 +199,10 @@ test('runProbe scores all cases 3 times and the report shows both stages passing
 
 test('a rerun resumes and skips finished rows', () => {
   const root = tmpRoot()
-  runProbe({ runId: 't2', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'x' })
+  runProbe({ cases: CORE, runId: 't2', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'x' })
   let calls = 0
   const counting = (...a) => { calls++; return goodModel(...a) }
-  const res = runProbe({ runId: 't2', budgetUsd: 5, repeats: 1, root, runner: counting, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't2', budgetUsd: 5, repeats: 1, root, runner: counting, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(calls, 0)
   assert.equal(res.rows.length, 8)
 })
@@ -208,7 +210,7 @@ test('a rerun resumes and skips finished rows', () => {
 test('the budget cap stops the run and records it as partial', () => {
   const root = tmpRoot()
   const pricey = (...a) => { const r = goodModel(...a); const j = JSON.parse(r.stdout); j.total_cost_usd = 0.4; return { ...r, stdout: JSON.stringify(j) } }
-  const res = runProbe({ runId: 't3', budgetUsd: 1, repeats: 3, root, runner: pricey, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't3', budgetUsd: 1, repeats: 3, root, runner: pricey, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(res.stoppedBy, 'budget')
   assert.ok(res.rows.length < 24)
 })
@@ -216,7 +218,7 @@ test('the budget cap stops the run and records it as partial', () => {
 test('3 failed calls in a row stop the run with the last error', () => {
   const root = tmpRoot()
   const broken = () => ({ error: new Error('ETIMEDOUT') })
-  const res = runProbe({ runId: 't4', budgetUsd: 5, repeats: 3, root, runner: broken, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't4', budgetUsd: 5, repeats: 3, root, runner: broken, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(res.stoppedBy, 'failures')
   assert.equal(res.rows.length, 3)
   assert.match(res.lastError, /ETIMEDOUT/)
@@ -225,13 +227,13 @@ test('3 failed calls in a row stop the run with the last error', () => {
 test('a call that reports no cost is recorded at the per-call cap', () => {
   const root = tmpRoot()
   const free = (...a) => { const r = goodModel(...a); const j = JSON.parse(r.stdout); delete j.total_cost_usd; return { ...r, stdout: JSON.stringify(j) } }
-  const res = runProbe({ runId: 't5', budgetUsd: 5, repeats: 1, root, runner: free, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't5', budgetUsd: 5, repeats: 1, root, runner: free, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(res.rows[0].cost, 0.5)
   assert.equal(res.rows[0].costEstimated, true)
 })
 
 test('runProbe stops before any call when claude is missing', () => {
-  const res = runProbe({ runId: 't6', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: goodModel, argv0: null, scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't6', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: goodModel, argv0: null, scriptCommit: 'x' })
   assert.equal(res.stoppedBy, 'no-claude')
   assert.equal(res.rows.length, 0)
 })
@@ -247,8 +249,8 @@ test('openRun keeps the latest row per case and attempt', () => {
 
 test('a rerun on a changed script commit runs again and the report splits by commit', () => {
   const root = tmpRoot()
-  runProbe({ runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'aaa' })
-  const res = runProbe({ runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'bbb' })
+  runProbe({ cases: CORE, runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'aaa' })
+  const res = runProbe({ cases: CORE, runId: 't8', budgetUsd: 5, repeats: 1, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'bbb' })
   assert.equal(res.rows.length, 16)
   const md = formatReport(res.rows, res.run)
   assert.match(md, /Script commit aaa/)
@@ -258,7 +260,7 @@ test('a rerun on a changed script commit runs again and the report splits by com
 test('a reply with no structured output becomes an invalid row, not a failure', () => {
   const root = tmpRoot()
   const empty = () => ({ status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, duration_ms: 5 }), stderr: '' })
-  const res = runProbe({ runId: 't9', budgetUsd: 5, repeats: 1, root, runner: empty, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't9', budgetUsd: 5, repeats: 1, root, runner: empty, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(res.stoppedBy, null)
   assert.equal(res.rows.length, 8)
   assert.ok(res.rows.every(r => r.status === 'invalid'))
@@ -291,7 +293,7 @@ test('formatReport names the rows\' script commit, not the first run\'s', async 
 
 test('a failed call keeps its error subtype on the row and in the report', () => {
   const failing = () => ({ status: 1, stdout: JSON.stringify({ is_error: true, subtype: 'error_max_budget_usd', result: 'over budget', total_cost_usd: 0.1 }), stderr: '' })
-  const res = runProbe({ runId: 't10', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: failing, argv0: ['claude'], scriptCommit: 'x' })
+  const res = runProbe({ cases: CORE, runId: 't10', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: failing, argv0: ['claude'], scriptCommit: 'x' })
   assert.equal(res.rows[0].subtype, 'error_max_budget_usd')
   assert.match(res.rows[0].error, /^error_max_budget_usd: over budget/)
   const md = formatReport(res.rows, res.run)
@@ -307,7 +309,7 @@ test('reply rows keep start and new confidence, and the report shows a partial a
     if (j.structured_output.replies) { j.structured_output.replies[0].kind = 'partial'; j.structured_output.replies[0].newConfidence = 62 }
     return { ...r, stdout: JSON.stringify(j) }
   }
-  const cases = loadCases().filter(c => c.stage === 'reply')
+  const cases = CORE.filter(c => c.stage === 'reply')
   const res = runProbe({ runId: 't11', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: partial, argv0: ['claude'], scriptCommit: 'x', cases })
   const row = res.rows[0]
   assert.equal(row.newConfidence, 62)
@@ -316,4 +318,15 @@ test('reply rows keep start and new confidence, and the report shows a partial a
   assert.match(md, new RegExp(`partial ${row.startConfidence}→62`))
   const old = res.rows.map(r => { const { startConfidence, newConfidence, ...rest } = r; return rest })
   assert.match(formatReport(old, res.run), /partial →62/)
+})
+
+test('formatReport scores against the run\'s own plan, or the cases in its rows', async () => {
+  const { formatReport } = await import('../evals/report.mjs')
+  const row = (caseId, stage, kind, attempt, outcome) => ({ key: `${caseId}#${attempt}@c`, scriptCommit: 'c', caseId, attempt, stage, kind, status: 'scored', outcome, pass: true, cost: 0.01 })
+  const rows = [1, 2, 3].flatMap(a => [row('t', 'ruling', 'trap', a, 'holds'), row('k', 'ruling', 'control', a, 'falls')])
+  // No plan in run.json: the plan comes from the 2 cases in the rows, so the stage is complete.
+  assert.match(formatReport(rows, { runId: 'r', budgetUsd: 5, spent: 0.06, repeats: 3 }), /\| ruling \| 3\/3 \| 3\/3 \| 0 \| PASS \| High \|/)
+  // A saved plan that asked for more runs makes the same rows incomplete.
+  const plan = { reply: { trap: 0, control: 0 }, ruling: { trap: 6, control: 3 } }
+  assert.match(formatReport(rows, { runId: 'r', budgetUsd: 5, spent: 0.06, repeats: 3, plan }), /\| ruling \| 3\/3 \| 3\/3 \| 0 \| incomplete \| Low \|/)
 })

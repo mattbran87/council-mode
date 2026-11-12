@@ -36,8 +36,10 @@ export function runProbe({ runId, budgetUsd = 5, repeats = 3, root = RUNS_ROOT, 
   if (problems.length) throw new Error(`invalid probe cases:\n${problems.join('\n')}`)
   const run = openRun(runId, root)
   const info = run.readRunInfo() || { runId, scriptCommit: commit, budgetUsd, repeats, started: new Date().toISOString() }
-  run.writeRunInfo({ ...info, budgetUsd })
-  const result = extra => ({ rows: run.latest(), score: score(run.latest().filter(r => r.scriptCommit === commit), planFor(cases, repeats)), run: { ...info, budgetUsd, spent: run.spent() }, ...extra })
+  // The plan records which cases this run covers, so a later report scores against them and not the current cases file.
+  const plan = planFor(cases, repeats)
+  run.writeRunInfo({ ...info, budgetUsd, repeats, plan })
+  const result = extra => ({ rows: run.latest(), score: score(run.latest().filter(r => r.scriptCommit === commit), plan), run: { ...info, budgetUsd, repeats, plan, spent: run.spent() }, ...extra })
   if (!argv0) return result({ stoppedBy: 'no-claude', lastError: 'claude is not on the PATH' })
 
   const done = new Set(run.latest().filter(r => r.status !== 'failed').map(r => r.key))
