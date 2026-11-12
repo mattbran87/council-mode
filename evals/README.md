@@ -126,7 +126,7 @@ The measures:
 
 The decision rule: version A beats version B when A's tied share is at least 0.10 higher and A's ranking spread is not higher. Each version has at most 21 ballots, so only large differences show.
 
-Run handling matches the probe: results go to `~/.claude/council-mode-evals/<run-id>/`, and the run stops at the budget cap or after 3 failed calls in a row. If you rerun the same run id, finished calls are skipped. A finished run therefore re-prints its report and rewrites `report.md` without new calls. If you edit `votePrompt` or `persona-voters.json`, the calls run again under a new script label.
+Run handling matches the probe: results go to `~/.claude/council-mode-evals/<run-id>/`, and the run stops at the budget cap or after 3 failed calls in a row. If you rerun the same run id, finished calls are skipped. A finished run therefore re-prints its report and rewrites `report.md` without new calls. If you edit `votePrompt`, change the voters file, or change the fixture, the calls run again under a new script label.
 
 ## The findings loop
 
