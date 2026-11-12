@@ -1,0 +1,97 @@
+{
+  "seed": 20261113,
+  "note": "Sheet-quality test voters: the 5-language follow-up voters with items 4 and 5 the user approved on 2026-11-12. cares is in rank order.",
+  "voters": [
+    {
+      "name": "Everyday engineer user",
+      "model": "haiku",
+      "cares": [
+        "fast start",
+        "easy install and update",
+        "clear help and errors",
+        "works offline after install",
+        "consistent flags across commands"
+      ],
+      "accepts": "a larger download",
+      "rejects": "a runtime they must manage themselves"
+    },
+    {
+      "name": "Platform team maintainer",
+      "model": "sonnet",
+      "cares": [
+        "speed of adding commands",
+        "debugging and test tooling",
+        "few dependencies",
+        "easy local reproduction of user bugs",
+        "short CI time per change"
+      ],
+      "accepts": "some build complexity",
+      "rejects": "a codebase only 1 team member can change"
+    },
+    {
+      "name": "Future new hire",
+      "model": "sonnet",
+      "cares": [
+        "readable code",
+        "size of the hiring pool",
+        "quality of docs and examples",
+        "a conventional project layout",
+        "good editor and IDE support"
+      ],
+      "accepts": "a less fashionable stack",
+      "rejects": "code that needs specialist knowledge to change"
+    },
+    {
+      "name": "Release engineer",
+      "model": "opus",
+      "cares": [
+        "reproducible builds for 3 OSes from one CI",
+        "code signing on macOS and Windows",
+        "small artifacts",
+        "automatic update delivery to users",
+        "simple rollback of a bad release"
+      ],
+      "accepts": "longer CI builds",
+      "rejects": "per-OS build machines kept by hand"
+    },
+    {
+      "name": "Security engineer",
+      "model": "opus",
+      "cares": [
+        "supply-chain risk of dependencies",
+        "memory safety",
+        "fast toolchain patches",
+        "safe handling of stored OAuth tokens",
+        "a small attack surface"
+      ],
+      "accepts": "fewer features",
+      "rejects": "unpinned or unaudited dependency trees"
+    },
+    {
+      "name": "Developer-experience support lead",
+      "model": "haiku",
+      "cares": [
+        "the same behavior on all 3 OSes",
+        "actionable error messages",
+        "easy diagnostics from users",
+        "detailed logs on request",
+        "users can check their own setup"
+      ],
+      "accepts": "a slower feature pace",
+      "rejects": "OS-specific bugs that need per-machine fixes"
+    },
+    {
+      "name": "Engineering manager (5-year owner)",
+      "model": "sonnet",
+      "cares": [
+        "total cost of ownership",
+        "staffing risk under turnover",
+        "long-term toolchain support",
+        "no lock-in to one vendor's tooling",
+        "low training cost for new staff"
+      ],
+      "accepts": "a higher first build cost",
+      "rejects": "a toolchain with uncertain 5-year support"
+    }
+  ]
+}
