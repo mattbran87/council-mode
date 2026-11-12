@@ -128,3 +128,89 @@ test('formatPersonaReport shows the version table, voter rows, and verdicts', ()
   assert.match(md, /v1 beats v2/)
   assert.match(md, /at most 21 ballots/)
 })
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join as pjoin } from 'node:path'
+import { runPersonaTest, FIXTURE_DIR } from '../evals/persona.mjs'
+import { loadFixture } from '../evals/lib/fixture.mjs'
+import { H } from '../evals/lib/helpers.mjs'
+
+const fx = loadFixture(FIXTURE_DIR)
+const anId = [...H.dossierIds(fx.run.dossier)].find(id => /-C\d+$/.test(id))
+const tmpRoot = () => mkdtempSync(pjoin(tmpdir(), 'cm-persona-'))
+
+// A fake model: votes in the order it was shown, citing a real claim; the judge ties every reason to cares1.
+const fakeModel = (cmd, args, opts) => {
+  const schema = JSON.parse(args[args.indexOf('--json-schema') + 1])
+  let out
+  if (schema.properties.ranking) {
+    const labels = opts.input.match(/Labels: ([A-Z, ]+)\./)[1].split(', ')
+    out = {
+      ranking: labels,
+      reasons: labels.slice(1).map((lower, i) => ({ higher: labels[i], lower, reason: 'r', cites: [anId] })),
+      flipCondition: 'x', unacceptable: [], hybrid: '',
+    }
+  } else {
+    const n = (opts.input.match(/^\d+\. /gm) || []).length
+    out = { reasons: Array.from({ length: n }, (_, index) => ({ index, serves: 'cares1', note: '' })), rejectsViolations: [] }
+  }
+  return { status: 0, stdout: JSON.stringify({ is_error: false, total_cost_usd: 0.01, duration_ms: 10, structured_output: out }), stderr: '' }
+}
+
+const base = { scriptCommit: 'abc', argv0: ['claude'], budgetUsd: 10 }
+
+test('runPersonaTest runs every voter call, then a judge call per valid ballot, with no tools', () => {
+  const calls = []
+  const runner = (cmd, args, opts) => { calls.push(args); return fakeModel(cmd, args, opts) }
+  const res = runPersonaTest({ ...base, runId: 'p1', repeats: 1, root: tmpRoot(), runner })
+  assert.equal(calls.length, 7 * 3 * 2)
+  for (const a of calls) {
+    assert.equal(a[a.indexOf('--tools') + 1], '')
+    assert.ok(!a.includes('--allowedTools'))
+  }
+  const judgeCalls = calls.filter(a => a[a.indexOf('--model') + 1] === 'opus' && !a[a.indexOf('--json-schema') + 1].includes('ranking'))
+  assert.equal(judgeCalls.length, 21)
+  assert.equal(res.summary.byVersion.v2.valid, 7)
+  assert.equal(res.summary.byVersion.v2.tiedShare, 1)
+  assert.equal(res.stoppedBy, null)
+})
+
+test('a rerun resumes and makes no new calls', () => {
+  const root = tmpRoot()
+  runPersonaTest({ ...base, runId: 'p2', repeats: 1, root, runner: fakeModel })
+  let calls = 0
+  const res = runPersonaTest({ ...base, runId: 'p2', repeats: 1, root, runner: (...a) => { calls++; return fakeModel(...a) } })
+  assert.equal(calls, 0)
+  assert.equal(res.summary.byVersion.v1.valid, 7)
+})
+
+test('an invalid ballot is counted and never judged', () => {
+  let judged = 0
+  const runner = (cmd, args, opts) => {
+    const r = fakeModel(cmd, args, opts)
+    const j = JSON.parse(r.stdout)
+    if (j.structured_output.ranking) j.structured_output.reasons.forEach(x => { x.cites = [] })
+    else judged++
+    return { ...r, stdout: JSON.stringify(j) }
+  }
+  const res = runPersonaTest({ ...base, runId: 'p3', repeats: 1, root: tmpRoot(), runner })
+  assert.equal(judged, 0)
+  assert.equal(res.summary.byVersion.v1.invalid, 7)
+})
+
+test('the budget stops the run and 3 failures in a row stop it with the last error', () => {
+  const pricey = (...a) => { const r = fakeModel(...a); const j = JSON.parse(r.stdout); j.total_cost_usd = 0.4; return { ...r, stdout: JSON.stringify(j) } }
+  const res = runPersonaTest({ ...base, runId: 'p4', repeats: 1, root: tmpRoot(), runner: pricey, budgetUsd: 1 })
+  assert.equal(res.stoppedBy, 'budget')
+  const broken = () => ({ status: 1, stdout: JSON.stringify({ is_error: true, subtype: 'error_during_execution', result: 'boom' }), stderr: '' })
+  const res2 = runPersonaTest({ ...base, runId: 'p5', repeats: 1, root: tmpRoot(), runner: broken })
+  assert.equal(res2.stoppedBy, 'failures')
+  assert.match(res2.lastError, /boom/)
+  assert.equal(res2.rows.length, 3)
+})
+
+test('no claude on the PATH stops before any call', () => {
+  const res = runPersonaTest({ ...base, runId: 'p6', repeats: 1, root: tmpRoot(), runner: fakeModel, argv0: null })
+  assert.equal(res.stoppedBy, 'no-claude')
+  assert.equal(res.rows.length, 0)
+})
