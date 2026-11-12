@@ -14,19 +14,22 @@ export function claudeArgv() {
   return [existsSync(exe) ? exe : first]
 }
 
-export function buildArgs({ model, schema, budgetUsd }) {
-  return [
+export const WEB_TOOLS = ['WebSearch', 'WebFetch']
+
+export function buildArgs({ model, schema, budgetUsd, tools = WEB_TOOLS }) {
+  const args = [
     '-p', '--output-format', 'json',
     '--model', model,
     '--max-budget-usd', budgetUsd.toFixed(4),
     '--json-schema', JSON.stringify(schema),
     // --safe-mode: no plugins, hooks, MCP servers, CLAUDE.md, or output styles, so the user's setup cannot change a call.
     '--safe-mode',
-    // --tools: the only tools the model can see.
-    '--tools', 'WebSearch,WebFetch',
-    // --allowedTools: in -p mode --tools alone does not grant permission, so the calls would be denied.
-    '--allowedTools', 'WebSearch,WebFetch',
+    // --tools: the only tools the model can see; an empty string turns every tool off.
+    '--tools', tools.join(','),
   ]
+  // --allowedTools: in -p mode --tools alone does not grant permission, so the calls would be denied.
+  if (tools.length) args.push('--allowedTools', tools.join(','))
+  return args
 }
 
 export function parseOutput(stdout) {
@@ -42,10 +45,10 @@ export function parseOutput(stdout) {
   return { ok: true, output, cost, durationMs }
 }
 
-export function runClaude({ prompt, model, schema, budgetUsd, runner = spawnSync, argv0 = claudeArgv() }) {
+export function runClaude({ prompt, model, schema, budgetUsd, tools, runner = spawnSync, argv0 = claudeArgv() }) {
   if (!argv0) return { ok: false, error: 'claude is not on the PATH' }
   const started = Date.now()
-  const res = runner(argv0[0], [...argv0.slice(1), ...buildArgs({ model, schema, budgetUsd })], {
+  const res = runner(argv0[0], [...argv0.slice(1), ...buildArgs({ model, schema, budgetUsd, tools })], {
     input: prompt, encoding: 'utf8', timeout: CALL_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024,
   })
   if (res.error) return { ok: false, error: res.error.message, durationMs: Date.now() - started }

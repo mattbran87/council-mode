@@ -330,3 +330,14 @@ test('formatReport scores against the run\'s own plan, or the cases in its rows'
   const plan = { reply: { trap: 0, control: 0 }, ruling: { trap: 6, control: 3 } }
   assert.match(formatReport(rows, { runId: 'r', budgetUsd: 5, spent: 0.06, repeats: 3, plan }), /\| ruling \| 3\/3 \| 3\/3 \| 0 \| incomplete \| Low \|/)
 })
+
+test('buildArgs can turn every tool off', async () => {
+  const { buildArgs } = await import('../evals/lib/claude.mjs')
+  const none = buildArgs({ model: 'opus', schema: { type: 'object' }, budgetUsd: 0.5, tools: [] })
+  assert.equal(none[none.indexOf('--tools') + 1], '')
+  assert.ok(!none.includes('--allowedTools'))
+  assert.ok(none.includes('--safe-mode'))
+  const web = buildArgs({ model: 'opus', schema: { type: 'object' }, budgetUsd: 0.5 })
+  assert.equal(web[web.indexOf('--tools') + 1], 'WebSearch,WebFetch')
+  assert.equal(web[web.indexOf('--allowedTools') + 1], 'WebSearch,WebFetch')
+})
