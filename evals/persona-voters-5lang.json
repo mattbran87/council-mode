@@ -1,0 +1,48 @@
+{
+  "seed": 20261113,
+  "note": "The 7 voters of the 5-language follow-up council run (wf_f85173db-8a6). criteria and model are word for word from that run; description is the v1 text the user approved on 2026-11-12.",
+  "voters": [
+    {
+      "name": "Everyday engineer user",
+      "model": "haiku",
+      "criteria": "Cares about (in order): fast start, easy install and update, clear help and errors\nAccepts: a larger download\nRejects: a runtime they must manage themselves",
+      "description": "A backend engineer who runs the tool many times a day while building services, often from their own scripts."
+    },
+    {
+      "name": "Platform team maintainer",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): speed of adding commands, debugging and test tooling, few dependencies\nAccepts: some build complexity\nRejects: a codebase only 1 team member can change",
+      "description": "One of the 6 developers on the platform team. Adds the new commands and fixes the tool when it breaks."
+    },
+    {
+      "name": "Future new hire",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): readable code, size of the hiring pool, quality of docs and examples\nAccepts: a less fashionable stack\nRejects: code that needs specialist knowledge to change",
+      "description": "A developer who joins the platform team in 2 years and inherits this tool with no handover from its authors."
+    },
+    {
+      "name": "Release engineer",
+      "model": "opus",
+      "criteria": "Cares about (in order): reproducible builds for 3 OSes from one CI, code signing on macOS and Windows, small artifacts\nAccepts: longer CI builds\nRejects: per-OS build machines kept by hand",
+      "description": "Runs the CI pipeline that builds, signs, and publishes each weekly release for macOS, Windows, and Linux."
+    },
+    {
+      "name": "Security engineer",
+      "model": "opus",
+      "criteria": "Cares about (in order): supply-chain risk of dependencies, memory safety, fast toolchain patches\nAccepts: fewer features\nRejects: unpinned or unaudited dependency trees",
+      "description": "Reviews the company's internal tools and their dependencies, and answers for any compromise that comes through them."
+    },
+    {
+      "name": "Developer-experience support lead",
+      "model": "haiku",
+      "criteria": "Cares about (in order): the same behavior on all 3 OSes, actionable error messages, easy diagnostics from users\nAccepts: a slower feature pace\nRejects: OS-specific bugs that need per-machine fixes",
+      "description": "Handles the tickets that engineers file when the tool fails on their laptop."
+    },
+    {
+      "name": "Engineering manager (5-year owner)",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): total cost of ownership, staffing risk under turnover, long-term toolchain support\nAccepts: a higher first build cost\nRejects: a toolchain with uncertain 5-year support",
+      "description": "Manages the platform team, owns its budget and hiring, and will own this tool for the next 5 years."
+    }
+  ]
+}
