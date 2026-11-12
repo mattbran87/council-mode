@@ -126,7 +126,16 @@ export function stability(rankings) {
   return { sameWinner: Math.max(...counts.values()), spread: pairs.length ? pairs.reduce((s, x) => s + x, 0) / pairs.length : null }
 }
 
-const mean = xs => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null)
+export const mean = xs => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null)
+
+// Panel diversity: how the first choices of valid ballots spread across options.
+export function firstChoiceStats(rankings) {
+  const firstChoices = {}
+  for (const r of rankings) firstChoices[r[0]] = (firstChoices[r[0]] || 0) + 1
+  const counts = Object.values(firstChoices)
+  const total = counts.reduce((s, x) => s + x, 0)
+  return { firstChoices, distinctFirst: counts.length, topFirstShare: total ? Math.max(...counts) / total : null }
+}
 
 // results: [{ voter, version, attempt, status: 'valid'|'invalid'|'missing', ranking?, measures? }]
 // A valid ballot with no measures (its judge call failed) counts for stability, not faithfulness.
@@ -147,15 +156,8 @@ export function summarize(results, voters, versions = VERSIONS) {
       }
     })
     byVoter.push(...cells)
-    // Panel diversity: how the valid ballots' first choices spread across options.
-    const firstChoices = {}
-    for (const r of rs.filter(x => x.status === 'valid')) firstChoices[r.ranking[0]] = (firstChoices[r.ranking[0]] || 0) + 1
-    const firstCounts = Object.values(firstChoices)
-    const validCount = firstCounts.reduce((s, x) => s + x, 0)
     byVersion[version] = {
-      firstChoices,
-      distinctFirst: firstCounts.length,
-      topFirstShare: validCount ? Math.max(...firstCounts) / validCount : null,
+      ...firstChoiceStats(rs.filter(x => x.status === 'valid').map(x => x.ranking)),
       valid: rs.filter(r => r.status === 'valid').length,
       invalid: rs.filter(r => r.status === 'invalid').length,
       missing: rs.filter(r => r.status === 'missing').length,
@@ -227,7 +229,8 @@ export function formatPersonaReport(summary, run, failed = []) {
 }
 
 // Turns the run's rows into one result per planned ballot: valid (with measures when judged), invalid, or missing.
-export function evaluate(rows, voters, versions, repeats, labels, ids) {
+// measure(judgment, ballot, version) turns a judge reply into the measures for one ballot.
+export function evaluate(rows, voters, versions, repeats, labels, ids, measure = (j, b) => ballotMeasures(j, b)) {
   const ok = rows.filter(r => r.status === 'ok')
   const find = (step, cell) => ok.find(r => r.step === step && r.cell === cell)
   const out = []
@@ -241,7 +244,7 @@ export function evaluate(rows, voters, versions, repeats, labels, ids) {
         const ballot = H.normalizeBallot(vote.output, labels, ids)
         if (!H.validateBallot(ballot, labels, ids).valid) { out.push({ ...base, status: 'invalid' }); continue }
         const judge = find('judge', cell)
-        out.push({ ...base, status: 'valid', ranking: ballot.ranking, measures: judge ? ballotMeasures(judge.output, ballot) : null })
+        out.push({ ...base, status: 'valid', ranking: ballot.ranking, measures: judge ? measure(judge.output, ballot, version) : null })
       }
     }
   })

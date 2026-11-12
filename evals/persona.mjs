@@ -1,87 +1,33 @@
 #!/usr/bin/env node
 // Persona test: node evals/persona.mjs --run-id <id> [--budget-usd 10] [--repeats 3] [--fixture <dir>] [--voters <file>]
 import { writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { H } from './lib/helpers.mjs'
-import { loadFixture } from './lib/fixture.mjs'
-import { runClaude, claudeArgv, PER_CALL_CAP_USD } from './lib/claude.mjs'
-import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
+import { claudeArgv } from './lib/claude.mjs'
+import { RUNS_ROOT } from './lib/runstore.mjs'
 import { scriptCommit } from './probe.mjs'
+import { runVoterTest, MAX_FAILURE_STREAK } from './lib/voter-runner.mjs'
 import {
-  loadVoters, VOTERS_PATH, VERSIONS, JUDGE_MODEL, JUDGE_SCHEMA, votePromptFor, orderFor, judgePrompt,
-  evaluate, summarize, formatPersonaReport,
+  loadVoters, VOTERS_PATH, VERSIONS, JUDGE_MODEL, JUDGE_SCHEMA, votePromptFor, judgePrompt,
+  ballotMeasures, summarize, formatPersonaReport,
 } from './lib/persona-core.mjs'
 
 export const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/2026-11-11-cli-language', import.meta.url))
-const MIN_CALL_USD = 0.01
-const MAX_FAILURE_STREAK = 3
+
+export const PERSONA_TEST = {
+  kind: 'persona',
+  versions: VERSIONS,
+  votePrompt: (version, voter, _i, dossierText, order) => votePromptFor(version, voter, dossierText, order),
+  judge: { model: JUDGE_MODEL, schema: JUDGE_SCHEMA, prompt: judgePrompt },
+  measure: (j, b) => ballotMeasures(j, b),
+}
 
 export function runPersonaTest({
   runId, budgetUsd = 10, repeats = 3, root = RUNS_ROOT, runner, argv0 = claudeArgv(),
   scriptCommit: commit = scriptCommit(), voters = loadVoters(), fixtureDir = FIXTURE_DIR,
 }) {
-  const fx = loadFixture(fixtureDir)
-  const { dossier, options } = fx.run
-  const labels = options.map(o => o.label)
-  const ids = H.dossierIds(dossier)
-  // The label changes with the vote prompt, the voters file, or the fixture, so any of them reruns the calls.
-  const label = `${commit}/${voters.hash}/${basename(fixtureDir)}`
-  const run = openRun(runId, root)
-  const info = run.readRunInfo() || { runId, kind: 'persona', started: new Date().toISOString() }
-  run.writeRunInfo({ ...info, scriptCommit: label, budgetUsd, repeats })
-  const done = new Set(run.latest().filter(r => r.status === 'ok').map(r => r.key))
-  let streak = 0
-  let lastError = null
-  let stoppedBy = argv0 ? null : 'no-claude'
-
-  const call = (key, meta, prompt, model, schema) => {
-    if (stoppedBy || done.has(key)) return
-    const remaining = budgetUsd - run.spent()
-    if (remaining < MIN_CALL_USD) { stoppedBy = 'budget'; return }
-    const res = runClaude({ prompt, model, schema, tools: [], budgetUsd: Math.min(PER_CALL_CAP_USD, remaining), runner, argv0 })
-    const row = { key, scriptCommit: label, ...meta, model, cost: res.cost ?? PER_CALL_CAP_USD, costEstimated: res.cost == null, durationMs: res.durationMs ?? null }
-    if (!res.ok || res.output == null) {
-      row.status = 'failed'
-      row.error = res.error || 'no structured output'
-      if (res.subtype) row.subtype = res.subtype
-      streak++
-      lastError = row.error
-    } else {
-      row.status = 'ok'
-      row.output = res.output
-      streak = 0
-      done.add(key)
-    }
-    run.append(row)
-    if (streak >= MAX_FAILURE_STREAK) stoppedBy = 'failures'
-  }
-
-  const cells = voters.voters.flatMap((voter, i) => VERSIONS.flatMap(version =>
-    Array.from({ length: repeats }, (_, k) => ({ voter, i, version, attempt: k + 1, cell: `${i}:${version}#${k + 1}` }))))
-  const meta = c => ({ cell: c.cell, voter: c.voter.name, version: c.version, attempt: c.attempt })
-
-  // Voter calls first.
-  for (const c of cells) {
-    const order = orderFor(voters.seed, c.i, labels)
-    const prompt = votePromptFor(c.version, c.voter, H.renderDossier(dossier, order), order)
-    call(`vote:${c.cell}@${label}`, { step: 'vote', ...meta(c) }, prompt, c.voter.model, H.BALLOT_SCHEMA)
-  }
-  // Then one judge call per valid ballot.
-  const current = () => run.latest().filter(r => r.scriptCommit === label)
-  for (const c of cells) {
-    const vote = current().find(r => r.step === 'vote' && r.cell === c.cell && r.status === 'ok')
-    if (!vote) continue
-    const ballot = H.normalizeBallot(vote.output, labels, ids)
-    if (!H.validateBallot(ballot, labels, ids).valid) continue
-    call(`judge:${c.cell}@${label}`, { step: 'judge', ...meta(c) }, judgePrompt(c.voter, ballot, options), JUDGE_MODEL, JUDGE_SCHEMA)
-  }
-
-  const rows = current()
-  const results = evaluate(rows, voters.voters, VERSIONS, repeats, labels, ids)
-  const summary = summarize(results, voters.voters)
-  const runInfo = { ...info, runId, scriptCommit: label, budgetUsd, repeats, spent: run.spent() }
-  return { rows, results, summary, stoppedBy, lastError, run: runInfo, dir: run.dir }
+  const res = runVoterTest({ runId, budgetUsd, repeats, root, runner, argv0, commit, voters, fixtureDir, test: PERSONA_TEST })
+  return { ...res, summary: summarize(res.results, voters.voters) }
 }
 
 function arg(name, fallback) {
