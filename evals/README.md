@@ -40,11 +40,20 @@ To add a fixture after a real run:
 
 The cases are modeled on claims in the fixture, then sharpened so the truth is clear-cut. They are not word-for-word quotes.
 
-Each case runs 3 times through `claude -p`. Every call uses the production prompt, the production schema (`--json-schema`), and the web search and fetch tools only.
+Each case runs 3 times through `claude -p`. Every call uses the production prompt, the production schema (`--json-schema`), and the web search and fetch tools only. The call runs with `--safe-mode`, so your plugins, hooks, MCP servers, and CLAUDE.md do not load. It passes `--tools WebSearch,WebFetch` and `--allowedTools WebSearch,WebFetch`, because `--tools` alone does not grant permission in `-p` mode.
 
 A `partial` reply counts as a pass for both reply traps and reply controls. A ruling passes only when it matches the expected verdict.
 
-A stage passes when trap resistance and control acceptance are both at least 5 of 6.
+A stage has a result and a confidence.
+
+- The plan is the number of cases of that stage and kind, times the repeats.
+- A stage is `incomplete` when either kind has fewer valid runs than 5/6 of its plan, rounded up. It gets no PASS or FAIL.
+- Otherwise the stage is `PASS` when trap resistance and control acceptance are both at least 5/6 of the valid runs, and `FAIL` when not.
+- Confidence is High when every planned run is valid and scored. It is Medium when there are enough valid runs but some calls failed or were invalid. It is Low when the stage is `incomplete`.
+
+The report shows a reply `partial` with the confidence change, for example `partial 85→78`. Rows saved before the start confidence was recorded show `partial →78`. The change does not affect the score.
+
+A failed call keeps the CLI's error subtype, for example a budget stop. The report lists it under "Failed calls".
 
 To run the probe:
 

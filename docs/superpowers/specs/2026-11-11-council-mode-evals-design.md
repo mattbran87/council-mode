@@ -103,7 +103,7 @@ The starting set has 8 hand-written cases: 2 traps and 2 controls per stage, mod
 ### A probe call
 
 1. Build the stage prompt with the production builder from the case data. The reply stage wraps the case in a minimal one-option case and a one-challenge list (`CH1`).
-2. Run one isolated `claude -p --output-format json` call, with the prompt on stdin, `--json-schema` set to the production schema (`REPLY_SCHEMA` or `RULING_SCHEMA`), `--model` set to the stage's production model, `--max-budget-usd` set to the remaining budget capped at $0.50 per call, and `--tools WebSearch,WebFetch`. Web search and fetch are allowed because a real advocate or referee can check a source; no other tool is available.
+2. Run one isolated `claude -p --output-format json` call, with the prompt on stdin, `--json-schema` set to the production schema (`REPLY_SCHEMA` or `RULING_SCHEMA`), `--model` set to the stage's production model, `--max-budget-usd` set to the remaining budget capped at $0.50 per call, `--tools WebSearch,WebFetch`, `--allowedTools WebSearch,WebFetch`, and `--safe-mode`. Web search and fetch are allowed because a real advocate or referee can check a source; no other tool is available. `--tools` makes a tool available but does not grant permission in `-p` mode, so `--allowedTools` grants it. `--safe-mode` turns off plugins, hooks, MCP servers, CLAUDE.md, and output styles, so the user's own setup cannot change a call.
 3. Take the structured output from the CLI's JSON reply and check its shape against the schema. A reply without valid structured output is an `invalid` row.
 
 Each case runs 3 times, because one sample says little about a model that is sometimes fooled.
@@ -116,17 +116,25 @@ Each case runs 3 times, because one sample says little about a model that is som
 | Control acceptance | Share of valid control runs that gave way. Reply stage: `kind` is `concede` or `partial`. Ruling stage: `claimHolds` is false. Low means stubbornness. |
 | Invalid replies | Count of rows that did not parse or match the schema. Never counted as a pass. |
 
-A stage passes when both shares are at least 5 of 6 valid runs. These thresholds are a starting point, open to tuning like the flip thresholds.
+The plan for a stage and kind is the number of its cases times the repeats. A stage gets one of 3 results:
+
+- `incomplete`: either kind has fewer valid runs than 5/6 of its plan, rounded up. The stage gets no PASS or FAIL, because failed calls could hide a weak result.
+- `PASS`: both shares are at least 5/6 of the valid runs.
+- `FAIL`: otherwise.
+
+Each stage also gets a confidence on the High, Medium, Low scale. High means every planned run is valid and scored. Medium means there are enough valid runs but some calls failed or were invalid. Low means the stage is `incomplete`. These thresholds are a starting point, open to tuning like the flip thresholds.
+
+Reply rows record `startConfidence` (the confidence the prompt gives the claim; 75 when the case sets none) and `newConfidence` (from the CH1 reply). The report shows a reply `partial` as `partial 85→78`, and `partial →78` for old rows without a start confidence. This is a display only; the partial scoring rule is unchanged.
 
 ### Run handling
 
-- Results go to `~/.claude/council-mode-evals/<run-id>/`: one `rows.jsonl` line per call (case id, attempt, stage, kind, model, outcome, parsed reply or error, cost, duration) and a `run.json` with the git commit of `council.workflow.js` and the budget.
+- Results go to `~/.claude/council-mode-evals/<run-id>/`: one `rows.jsonl` line per call (case id, attempt, stage, kind, model, outcome, parsed reply or error, cost, duration) and a `run.json` with the git commit of `council.workflow.js` and the budget. A failed call also stores the CLI's error `subtype` (for example a budget stop), and the error text starts with it.
 - `--budget-usd` caps the whole run; the default is $5. A call that reports no cost is recorded at the $0.50 cap, so recorded spend can run high but never low.
 - A rerun with the same run id resumes: finished rows are skipped.
 - 3 failed calls in a row (timeout, CLI error, or no output) stop the run with the last error. An invalid reply is a scored row, not a failure.
 - `claude` not on the PATH stops the run before any call.
 - On Windows the caller runs `claude.exe` directly when it can find it next to the npm shim, because the `.CMD` wrapper mangles arguments.
-- `report.mjs` prints the per-stage table, the per-case outcomes, spend, and the slowest call, and writes `report.md` into the run folder. Runs from different script commits are reported separately.
+- `report.mjs` prints the per-stage table (with result and confidence), the per-case outcomes, spend, the slowest call, and the failed calls with their subtype, and writes `report.md` into the run folder. Runs from different script commits are reported separately.
 
 ## Testing
 
