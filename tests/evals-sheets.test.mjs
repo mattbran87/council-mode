@@ -158,3 +158,8 @@ test('the sheet-test voter prompts carry each variant sheet', () => {
   assert.equal(votes.filter(p => p.includes('in no particular order')).length, 7)
   assert.equal(votes.filter(p => !p.includes('Rejects:')).length, 7)
 })
+
+test('differences counts a ranking-spread gap of 0.5 or more', () => {
+  const by = { S0: { spread: 0.48 }, S4: { spread: 1.05 }, S3: { spread: 0.38 } }
+  assert.deepEqual(differences(by).map(d => `${d.version} ${d.measure} ${d.gap.toFixed(2)}`), ['S4 spread 0.57'])
+})

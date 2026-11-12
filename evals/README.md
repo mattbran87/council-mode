@@ -165,7 +165,7 @@ The judge always scores against the full reference sheet: 5 ranked items, Accept
 - **Rejects violations:** adjacent pairs where the higher option breaks the Rejects line. This tests the limits (S2 against S0).
 - **Stability and panel diversity:** as in the persona test.
 
-The decision rule compares each version with S0. A difference counts when the gap is at least 0.10 for adherence, coverage, or top-item weight, 0.15 for the top first-choice share, or 0.5 for mean rejects violations. Each version has at most 21 ballots, so only large effects show.
+The decision rule compares each version with S0. A difference counts when the gap is at least 0.10 for adherence, coverage, or top-item weight, 0.15 for the top first-choice share, 0.5 for mean rejects violations, or 0.5 for ranking spread. The ranking-spread bar applies from the run after `2026-11-12-sheets1`. Each version has at most 21 ballots, so only large effects show.
 
 ## The findings loop
 

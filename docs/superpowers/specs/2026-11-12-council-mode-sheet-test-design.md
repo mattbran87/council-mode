@@ -98,6 +98,7 @@ Each variant is compared with S0 only. It differs from S0 on a measure when the 
 - 0.10 for adherence, coverage, or top-item weight
 - 0.15 for the top first-choice share
 - 0.5 for mean rejects violations
+- 0.5 for ranking spread. This bar was added after run `2026-11-12-sheets1` and applies from the next run.
 
 The report lists every difference that passes its bar, with its sign: for example, "S2: rejects violations +0.71". Each version has at most 21 ballots, so only large effects show, and the report says so.
 

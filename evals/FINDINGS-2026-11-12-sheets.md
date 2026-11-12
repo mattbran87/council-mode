@@ -79,3 +79,54 @@ Voters argued from item 3 in 11 of 105 reasons when the sheet showed it, and in 
 **What it shows.** A 2-item sheet loses little. Coverage fell by 0.04, and S3 kept the minority pick: the platform team maintainer picked JavaScript 3 times out of 3. This agrees with the value-profile study, where 2 query-relevant values beat a full profile. The passed top-item weight bar is mechanical: with 2 items, more "Cares about" reasons land on item 1 because there are fewer items to spread across. S3's small leads in stability and diversity are under their bars.
 
 **Decision (user, 2026-11-12).** Keep 3 items as the default. Step 1 of the skill now says: "Give 3 ranked "Cares about" items. 2 is enough when a third item would not separate the options." Evidence log: E8.
+
+## S4: 5 items
+
+**Result.**
+- **Adherence:** 0.93 → 0.87.
+- **Coverage:** 0.94 → 0.87.
+- **Same winner:** 3.00 → 2.57, the least stable version.
+- **Ranking spread:** 0.48 → 1.05, more than double.
+
+Items 4 and 5 carried 10 of 105 reasons, and 14 of 105 reasons tied to no line, against 6 under S0. No difference passed a bar: the decision rule set none for stability.
+
+**What it shows.** Voters used the extra items rarely, and the longer sheet made them less steady. 3 voters changed their first choice between repeats:
+- the everyday engineer user: Go, Rust, Go
+- the platform team maintainer: Go, JS, JS
+- the engineering manager: Go, C#, Go
+
+No voter did under S0. A longer list seems to blur what the voter weighs.
+
+**Decisions (user, 2026-11-12).**
+- **Cap at 3 items.** Step 1 of the skill now says: "Give 3 ranked "Cares about" items, and no more than 3. 2 is enough when a third item would not separate the options."
+- **Add a ranking-spread bar.** A bar of 0.5 for ranking spread joins the decision rule, from the next run onward. It is not applied after the fact to this run, so this file's verdicts stand as written. A later re-render of this run's report would list the S4 spread gap (+0.57) under the new bar.
+
+Evidence log: E9.
+
+## Template recommendation
+
+Keep the template as it is, with the rules above made explicit:
+
+```
+Persona: <stakeholder>
+Cares about (in order): <item 1>, <item 2>, <item 3>
+Accepts: <what this stakeholder will trade away>
+Rejects: <what this stakeholder rules out>
+Model: <model>
+```
+
+- **Ranked items.** Ranking decided the run's only minority pick (E5).
+- **Accepts and Rejects lines.** They carry about 1 reason in 5 and kept that same minority pick (E6).
+- **3 items, at most.** 2 is enough when a third would not separate the options (E8). 5 made voters less steady (E9).
+
+## Limits
+
+- **One scenario.** It has 1 clear favorite, and only 1 voter made a minority pick under the production sheet, so the diversity results rest on that voter.
+- **Small samples.** 21 ballots per version: only large effects show.
+- **One judge.** The judge is the only rater, and Rejects-violation flags are unchecked (E7).
+
+## What to test next
+
+1. **S0 against S1 with more repeats.** Use 5 repeats, with voters whose top item favors a non-favorite option.
+2. **Rejects violations by hand.** Read S0's flagged violations to tell real overrides from judge over-flagging. This needs no new calls.
+3. **A scenario with no clear favorite.** That tests sheets where diversity has room to show.

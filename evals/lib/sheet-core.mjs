@@ -79,7 +79,8 @@ export function summarizeSheets(results, voters, versions = SHEET_VERSIONS) {
 }
 
 // Decision rule from the spec: the smallest gap from S0 that counts, per measure.
-export const BARS = { adherence: 0.10, coverage: 0.10, topWeight: 0.10, topFirstShare: 0.15, violations: 0.5 }
+// spread was added after run 2026-11-12-sheets1 and applies from the next run.
+export const BARS = { adherence: 0.10, coverage: 0.10, topWeight: 0.10, topFirstShare: 0.15, violations: 0.5, spread: 0.5 }
 
 export function differences(byVersion, base = 'S0') {
   const out = []
@@ -117,7 +118,7 @@ export function formatSheetReport(summary, run, failed = []) {
       return `| ${k} | ${x.valid} | ${x.invalid} | ${x.missing} | ${f2(x.adherence)} | ${f2(x.coverage)} | ${f2(x.topWeight)} | ${f2(x.violations)} | ${f2(x.sameWinner)} | ${f2(x.spread)} | ${f2(x.topFirstShare)} |`
     }),
     '',
-    `Differences from S0 that pass their bar (adherence, coverage, top-item weight ${BARS.adherence.toFixed(2)}; top first-choice share ${BARS.topFirstShare.toFixed(2)}; rejects violations ${BARS.violations.toFixed(2)}):`,
+    `Differences from S0 that pass their bar (adherence, coverage, top-item weight ${BARS.adherence.toFixed(2)}; top first-choice share ${BARS.topFirstShare.toFixed(2)}; rejects violations and ranking spread ${BARS.violations.toFixed(2)}):`,
     ...(diffs.length ? diffs.map(d => `- ${d.version}: ${d.measure} ${signed(d.gap)}`) : ['- none']),
     '',
     'Each version has at most 21 ballots, so only large effects show.',
