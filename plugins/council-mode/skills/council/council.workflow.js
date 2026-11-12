@@ -646,11 +646,18 @@ function rulingPrompt(group, claim) {
   return lines.join('\n')
 }
 
-function votePrompt(persona, dossierText, order) {
+// The voter's identity: the persona name and criteria sheet. The eval swaps this block to test other identities.
+function voterIdentity(persona) {
   return [
     `You are a voter on a decision panel. Your persona: ${persona.name}.`,
     'Your criteria sheet:',
     persona.criteria,
+  ].join('\n')
+}
+
+function votePrompt(persona, dossierText, order, identity = voterIdentity(persona)) {
+  return [
+    identity,
     '',
     'Rank every option by your criteria, using only the dossier below. The debate authors are hidden.',
     '',

@@ -4,4 +4,5 @@ import { loadHelpers } from '../../tests/harness.mjs'
 export const H = loadHelpers(
   'validateBallot', 'dossierIds', 'tally', 'flipStats', 'renderDossier',
   'rulingPrompt', 'replyPrompt', 'numberCase', 'REPLY_SCHEMA', 'RULING_SCHEMA',
+  'votePrompt', 'voterIdentity', 'BALLOT_SCHEMA', 'normalizeBallot', 'makeRng', 'shuffle',
 )
