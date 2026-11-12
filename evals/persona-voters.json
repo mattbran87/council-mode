@@ -1,0 +1,48 @@
+{
+  "seed": 20261112,
+  "note": "The 7 voters of the first council run (wf_56c338be-369). criteria and model are word for word from that run; description is the v1 text the user approved on 2026-11-12.",
+  "voters": [
+    {
+      "name": "Field-data coordinator",
+      "model": "haiku",
+      "criteria": "Cares about (in order): runs with no setup, clear error messages, fast on small files\nAccepts: a larger download from the share\nRejects: anything that needs IT to install something",
+      "description": "Runs inspection uploads from a Windows 11 laptop between site visits. Not a developer; uses the tool a few times a day on small files."
+    },
+    {
+      "name": "Team developer (maintainer)",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): uses skills the team has now, debugging and tooling quality, few dependencies\nAccepts: some extra build steps\nRejects: an option only 1 of the 4 developers can maintain",
+      "description": "One of the 4 developers on the GIS team. Writes and fixes the team's internal tools, and gets the call when one breaks."
+    },
+    {
+      "name": "Future new hire",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): readable code, size of the hiring pool, quality of docs and examples\nAccepts: a less fashionable stack\nRejects: code that needs specialist knowledge to change",
+      "description": "A developer who joins the team in 2 years and inherits this tool with no handover from its authors."
+    },
+    {
+      "name": "Nightly-job owner (Linux build agents)",
+      "model": "opus",
+      "criteria": "Cares about (in order): startup time per call, total runtime over 500 calls, predictable memory\nAccepts: a slightly slower single run if the total fits the window\nRejects: anything that risks missing the 2-hour window",
+      "description": "Runs the 2 Linux build agents that call the tool up to 500 times a night, and gets paged when the nightly window is missed."
+    },
+    {
+      "name": "Desktop IT and security",
+      "model": "haiku",
+      "criteria": "Cares about (in order): no admin rights or installs, signed or scannable files, few moving parts\nAccepts: a file or folder copied from the share\nRejects: anything that writes to system locations or needs exceptions to policy",
+      "description": "Manages the locked-down Windows 11 laptop fleet and approves what software may run on it."
+    },
+    {
+      "name": "GIS data steward (feature service owner)",
+      "model": "opus",
+      "criteria": "Cares about (in order): correct uploads, safe retries, clear logs of what was rejected\nAccepts: slower uploads if they are correct\nRejects: silent partial uploads",
+      "description": "Owns the ArcGIS Enterprise feature service the tool uploads into, and answers for the quality of its data."
+    },
+    {
+      "name": "Team lead (5-year owner)",
+      "model": "sonnet",
+      "criteria": "Cares about (in order): total cost of ownership, staffing risk under turnover, long-term support of the toolchain\nAccepts: a higher first build cost\nRejects: a toolchain with uncertain support over 5 years",
+      "description": "Leads the 4-person team, owns its budget and hiring, and will own this tool for the next 5 years."
+    }
+  ]
+}
