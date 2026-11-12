@@ -1,0 +1,2807 @@
+{
+  "summary": "Advocates argue each option with evidence, debate under a blind referee, and a 7-persona panel ranks the options",
+  "agentCount": 45,
+  "logs": [],
+  "result": {
+    "options": [
+      {
+        "description": "Write the CLI in Python.",
+        "baseline": false,
+        "label": "B"
+      },
+      {
+        "description": "Write the CLI in Rust.",
+        "baseline": false,
+        "label": "Q"
+      },
+      {
+        "description": "Write the CLI in Go.",
+        "baseline": false,
+        "label": "P"
+      },
+      {
+        "description": "Write the CLI in C#.",
+        "baseline": false,
+        "label": "Y"
+      },
+      {
+        "description": "Write the CLI in JavaScript (Node.js or TypeScript).",
+        "baseline": false,
+        "label": "G"
+      },
+      {
+        "description": "Shell scripts (Bash on macOS and Linux, PowerShell on Windows) with no compiled language.",
+        "baseline": true,
+        "label": "D"
+      }
+    ],
+    "dossier": {
+      "problem": "Synthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tokens. It runs dozens of times a day per engineer, often from other scripts.\n\nThe team's experience is mixed: 2 developers write mostly Python, 2 mostly TypeScript, 1 Go, and 1 C#. Nobody has shipped production Rust. The tool must be maintained for at least 5 years, with normal staff turnover, and ships a release every week.\n\nHard constraints: installs and updates with one command on all 3 operating systems, without admin rights; common commands start in under 300 ms; behaves the same on all 3 operating systems; no paid licenses.\n\nSuccess: 80% of engineers use it within 6 months; under 1 support ticket per 100 users per month; the team ships a new command in under a week.",
+      "options": [
+        {
+          "label": "B",
+          "description": "Write the CLI in Python.",
+          "claims": [
+            {
+              "id": "B-C1",
+              "evidence": "reasoned",
+              "text": "Python is the team's largest shared skill: 2 of 6 write it daily, and a Go, C# or TypeScript developer can read it quickly. Weekly releases and a new command in under a week favor the language with the lowest ramp-up.",
+              "source": "",
+              "confidence": 70,
+              "status": "stands"
+            },
+            {
+              "id": "B-C2",
+              "evidence": "reasoned",
+              "text": "Python's hiring and turnover pool is very large. Over 5 years of staff turnover, replacements who can maintain a Python CLI are easier to find than for Rust, and probably easier than for Go.",
+              "source": "",
+              "confidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "B-C3",
+              "evidence": "reasoned",
+              "text": "Scaffolding is Python's strength: Jinja2 or Cookiecutter-style templating, subprocess, pathlib, and the stdlib's json and argparse cover scaffold, local checks, and REST calls with little code. This supports shipping commands in under a week.",
+              "source": "",
+              "confidence": 70,
+              "status": "stands"
+            },
+            {
+              "id": "B-C4",
+              "evidence": "reasoned",
+              "text": "Mature OAuth and HTTP libraries exist (authlib, msal, requests/httpx) and a pure-Python wheel installs identically on macOS, Windows and Linux. That reduces the cross-OS behavior risk versus native builds per platform.",
+              "source": "",
+              "confidence": 60,
+              "revisedConfidence": 45,
+              "status": "struck"
+            },
+            {
+              "id": "B-C5",
+              "evidence": "reasoned",
+              "text": "Install and update can be one command without admin rights using per-user tools such as 'uv tool install' or 'pipx install' from an internal package index. Updates are 'uv tool upgrade'. No paid licenses are involved.",
+              "source": "",
+              "confidence": 55,
+              "revisedConfidence": 40,
+              "status": "struck"
+            },
+            {
+              "id": "B-C6",
+              "evidence": "reasoned",
+              "text": "Interpreter startup is roughly tens of milliseconds, so 300 ms is reachable if imports are lazy and heavy libraries are avoided on common commands. This is a design discipline, and I did not measure it.",
+              "source": "",
+              "confidence": 50,
+              "revisedConfidence": 45,
+              "status": "struck"
+            },
+            {
+              "id": "B-C7",
+              "evidence": "reasoned",
+              "text": "Weekly releases are cheap in Python: no compile or cross-build matrix, and one pure wheel is published per release. CI stays small, which suits a 6-person team.",
+              "source": "",
+              "confidence": 60,
+              "status": "stands"
+            },
+            {
+              "id": "B-C8",
+              "evidence": "reasoned",
+              "text": "Under 1 ticket per 100 users per month is more likely when the tool is simple to patch. Python tracebacks are readable by every team member, so fixes ship quickly.",
+              "source": "",
+              "confidence": 40,
+              "status": "stands"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "B-W1",
+              "text": "Python is not a self-contained binary. Engineers need a working Python or uv bootstrap, which can break the one-command, no-admin install on locked-down Windows laptops. It also adds environment and version-drift support tickets, which threatens the under-1-ticket-per-100-users target."
+            },
+            {
+              "id": "B-W2",
+              "text": "The 300 ms startup limit is at risk. Python import time grows with dependencies (OAuth, HTTP, templating), and Windows antivirus scanning slows cold starts. Scripted use dozens of times a day amplifies this. I measured nothing, so the case relies on reasoning."
+            }
+          ],
+          "failedTests": []
+        },
+        {
+          "label": "Q",
+          "description": "Write the CLI in Rust.",
+          "claims": [
+            {
+              "id": "Q-C1",
+              "evidence": "reasoned",
+              "text": "Rust compiles to a single native binary with no runtime. Python, Node and .NET targets must install or bundle an interpreter or runtime, which is hard to do without admin rights. This directly supports the one-command, no-admin install constraint.",
+              "source": "",
+              "confidence": 80,
+              "revisedConfidence": 65,
+              "status": "struck"
+            },
+            {
+              "id": "Q-C2",
+              "evidence": "reasoned",
+              "text": "Native Rust startup is typically a few milliseconds, far inside the 300 ms limit. Python and Node CLIs often spend 50-300 ms on startup and imports. The tool runs dozens of times a day, often from scripts, so this margin matters.",
+              "source": "",
+              "confidence": 78,
+              "status": "stands"
+            },
+            {
+              "id": "Q-C3",
+              "evidence": "reasoned",
+              "text": "Rust's std and crates like clap, reqwest and oauth2 abstract away OS differences in paths, line endings and TLS. Pure-Rust TLS (rustls) avoids reliance on a system OpenSSL, which supports identical behavior on macOS, Windows and Linux.",
+              "source": "",
+              "confidence": 65,
+              "revisedConfidence": 50,
+              "status": "struck"
+            },
+            {
+              "id": "Q-C4",
+              "evidence": "reasoned",
+              "text": "Cross-compiling and releasing per-OS binaries from one CI pipeline is a well-trodden path (cargo-dist, GitHub Actions matrices). That fits the weekly release cadence, and the toolchain, crates and licences are all free (MIT/Apache), so there is no paid-licence issue.",
+              "source": "",
+              "confidence": 62,
+              "status": "stands"
+            },
+            {
+              "id": "Q-C5",
+              "evidence": "reasoned",
+              "text": "Rust's type system and exhaustive enums catch whole classes of bugs at compile time. Those classes include missed error cases in OAuth and REST handling. That lowers post-release defects and supports the under-1-ticket-per-100-users-per-month target over a 5-year life.",
+              "source": "",
+              "confidence": 55,
+              "status": "stands"
+            },
+            {
+              "id": "Q-C6",
+              "evidence": "reasoned",
+              "text": "Rust has no GC and no runtime-version drift. A 5-year-old binary keeps working without users managing Python or Node versions. Env and interpreter breakage is a main source of CLI support tickets, so this reduces that ticket class.",
+              "source": "",
+              "confidence": 60,
+              "status": "stands"
+            },
+            {
+              "id": "Q-C7",
+              "evidence": "reasoned",
+              "text": "Rust is widely used for developer CLIs (ripgrep, uv, ruff, GitHub-adjacent tooling), so patterns for self-update, shell completions and packaging are mature. Hiring and onboarding for Rust is also viable because many engineers want to learn it.",
+              "source": "",
+              "confidence": 50,
+              "revisedConfidence": 35,
+              "status": "struck"
+            },
+            {
+              "id": "Q-C8",
+              "evidence": "reasoned",
+              "text": "Static, fast and predictable output suits scripted invocation: tiny binary size, low memory, deterministic exit codes. Engineers calling the tool inside other scripts will not feel it as a slow dependency, which helps the 80% adoption goal.",
+              "source": "",
+              "confidence": 55,
+              "status": "stands"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "Q-W1",
+              "text": "Nobody on the team has shipped production Rust, and the borrow checker has a steep learning curve. This puts the 'new command in under a week' success metric at real risk, especially in early months and after staff turnover."
+            },
+            {
+              "id": "Q-W2",
+              "text": "The no-admin one-command install and update on all 3 OS is not free. Self-update, Windows code signing, SmartScreen and macOS Gatekeeper notarization are extra work. Without signing, unsigned binaries may be blocked, which hurts adoption and tickets."
+            }
+          ],
+          "failedTests": []
+        },
+        {
+          "label": "P",
+          "description": "Write the CLI in Go.",
+          "claims": [
+            {
+              "id": "P-C1",
+              "evidence": "reasoned",
+              "text": "Go compiles to one static binary per OS/arch with no runtime to install. Users need no Python, Node or .NET, so no admin rights and no version conflicts. This fits the one-command, no-admin install constraint.",
+              "source": "",
+              "confidence": 85,
+              "revisedConfidence": 68,
+              "status": "struck"
+            },
+            {
+              "id": "P-C2",
+              "evidence": "reasoned",
+              "text": "Native binaries start in single-digit to tens of milliseconds. That is far under the 300 ms budget on all three OSes. Python, Node and JIT-based .NET startup risk the budget when run dozens of times daily from scripts.",
+              "source": "",
+              "confidence": 85,
+              "status": "stands"
+            },
+            {
+              "id": "P-C3",
+              "evidence": "reasoned",
+              "text": "Cross-compiling for macOS, Windows and Linux from one CI job is built into the Go toolchain (GOOS/GOARCH). A weekly release needs no per-OS build machines, and the same code is the same binary logic everywhere.",
+              "source": "",
+              "confidence": 82,
+              "revisedConfidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "P-C4",
+              "evidence": "reasoned",
+              "text": "Go's standard library covers HTTP client, TLS, JSON, file paths and process execution. Mature libraries exist for CLIs (cobra) and OAuth (golang.org/x/oauth2). Few dependencies means less supply-chain churn over five years.",
+              "source": "",
+              "confidence": 78,
+              "status": "stands"
+            },
+            {
+              "id": "P-C5",
+              "evidence": "reasoned",
+              "text": "Go is small and conventional, and Go 1 compatibility promises are strong. Python, TypeScript and C# developers can learn it in weeks, and new hires read it easily. This helps five-year turnover and the under-one-week command target.",
+              "source": "",
+              "confidence": 72,
+              "revisedConfidence": 60,
+              "status": "struck"
+            },
+            {
+              "id": "P-C6",
+              "evidence": "reasoned",
+              "text": "Nobody on the team has shipped Rust, so Rust carries real learning risk. Go has one team member with experience, who can set conventions and review. That gives lower ramp-up risk than Rust with comparable runtime properties.",
+              "source": "",
+              "confidence": 75,
+              "revisedConfidence": 55,
+              "status": "conceded"
+            },
+            {
+              "id": "P-C7",
+              "evidence": "reasoned",
+              "text": "Single binaries are easy to call from other scripts: stable exit codes, no interpreter or environment dependency. Support tickets from broken virtualenvs, node versions or missing runtimes largely disappear, helping the under-1-per-100-users goal.",
+              "source": "",
+              "confidence": 78,
+              "revisedConfidence": 60,
+              "status": "struck"
+            },
+            {
+              "id": "P-C8",
+              "evidence": "reasoned",
+              "text": "Go's tooling (go test, gofmt, vet, module proxy) is free and consistent, so no paid licences are needed. Self-update and one-command install can be done via a package manager or install script, though this needs building.",
+              "source": "",
+              "confidence": 70,
+              "status": "stands"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "P-W1",
+              "text": "Only 1 of 6 developers writes Go, so 5 must retrain, and the bus factor on idiomatic Go is 1. The weekly release cadence could slow early on. A Python or TypeScript team could ship the first commands faster."
+            },
+            {
+              "id": "P-W2",
+              "text": "I made no tool calls, so no claim is backed by a cited source or a test. Startup times, self-update behaviour without admin rights on Windows (a running .exe cannot be replaced in place), and one-command installs across all three OSes are unverified. Go also needs extra work for OS-specific edge cases like the keychain, signing and notarisation on macOS, and Windows SmartScreen or antivirus flags."
+            }
+          ],
+          "failedTests": []
+        },
+        {
+          "label": "Y",
+          "description": "Write the CLI in C#.",
+          "claims": [
+            {
+              "id": "Y-C1",
+              "evidence": "reasoned",
+              "text": "C# with Native AOT or ReadyToRun single-file publish yields a self-contained binary for win/osx/linux, needing no runtime or admin rights on user machines, which fits the no-admin install constraint.",
+              "source": "",
+              "confidence": 80,
+              "revisedConfidence": 70,
+              "status": "stands"
+            },
+            {
+              "id": "Y-C2",
+              "evidence": "reasoned",
+              "text": "Native AOT .NET CLIs typically start in tens of milliseconds, well under the 300 ms budget, unlike Python or Node tools whose cold start and import cost grow with dependencies.",
+              "source": "",
+              "confidence": 70,
+              "status": "stands"
+            },
+            {
+              "id": "Y-C3",
+              "evidence": "reasoned",
+              "text": "One compiled binary has no interpreter or dependency drift, so behavior is identical across macOS, Windows 11 and Linux, and scripts calling it dozens of times daily never hit environment breakage that drives tickets.",
+              "source": "",
+              "confidence": 75,
+              "revisedConfidence": 60,
+              "status": "struck"
+            },
+            {
+              "id": "Y-C4",
+              "evidence": "reasoned",
+              "text": "C# is statically typed with strong IDE tooling, and its syntax is familiar to the 2 TypeScript developers (same language designer lineage) and the Go developer, so ramp-up for the 4 non-C# developers is short.",
+              "source": "",
+              "confidence": 60,
+              "revisedConfidence": 40,
+              "status": "struck"
+            },
+            {
+              "id": "Y-C5",
+              "evidence": "reasoned",
+              "text": "The BCL includes HttpClient, System.CommandLine, JSON, and process and file APIs, while Microsoft.Identity.Client and Duende-style libraries cover OAuth flows, so REST plus OAuth needs little third-party code and fewer supply-chain updates.",
+              "source": "",
+              "confidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "Y-C6",
+              "evidence": "reasoned",
+              "text": ".NET is MIT-licensed and free, with long-term-support releases every other year, so a 5-year maintenance horizon is covered by planned LTS upgrades. No paid licenses are needed.",
+              "source": "",
+              "confidence": 80,
+              "status": "stands"
+            },
+            {
+              "id": "Y-C7",
+              "evidence": "reasoned",
+              "text": "C# is more mainstream than Rust and offers a hiring pool bigger than Go's for enterprise teams, so normal turnover over 5 years is easier to absorb. Garbage collection avoids a Rust-style learning curve for weekly releases.",
+              "source": "",
+              "confidence": 55,
+              "status": "stands"
+            },
+            {
+              "id": "Y-C8",
+              "evidence": "reasoned",
+              "text": "Per-OS CI builds with a matrix are straightforward. A weekly release can publish the binaries to a package feed or internal URL, and a built-in self-update command gives the one-command no-admin update.",
+              "source": "",
+              "confidence": 60,
+              "revisedConfidence": 40,
+              "status": "struck"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "Y-W1",
+              "text": "Only 1 of 6 developers knows C#, so a single-person knowledge silo and bus-factor risk exist at the start. Go, by contrast, gives similarly small static binaries and simpler cross-compilation with similar team skill."
+            },
+            {
+              "id": "Y-W2",
+              "text": "Native AOT cannot cross-compile, restricts reflection and trimming, and brings macOS notarization and Windows SmartScreen signing friction. The one-command no-admin installer and self-updater must be built by the team in any language, and I did not verify startup or install claims."
+            }
+          ],
+          "failedTests": []
+        },
+        {
+          "label": "G",
+          "description": "Write the CLI in JavaScript (Node.js or TypeScript).",
+          "claims": [
+            {
+              "id": "G-C1",
+              "evidence": "cited",
+              "text": "Node.js can build single executables for Windows, macOS and Linux from one JSON config, and can target another OS from a build host. That gives one-file, no-runtime installs without admin rights.",
+              "source": "https://nodejs.org/api/single-executable-applications.html",
+              "confidence": 78,
+              "revisedConfidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "G-C2",
+              "evidence": "cited",
+              "text": "Node runs TypeScript natively by type stripping, and this is marked Stable (v25.2 / v24.12). TS developers need no build step, and Python, Go and C# developers still get type checking from tsc in CI.",
+              "source": "https://nodejs.org/api/typescript.html",
+              "confidence": 85,
+              "revisedConfidence": 65,
+              "status": "struck"
+            },
+            {
+              "id": "G-C3",
+              "evidence": "cited",
+              "text": "module.enableCompileCache() persists V8 code cache on disk. The docs say later loads of unchanged modules can get a significant speedup. This is a documented lever toward the 300 ms start budget, but it gives no figures.",
+              "source": "https://nodejs.org/api/module.html",
+              "confidence": 60,
+              "status": "stands"
+            },
+            {
+              "id": "G-C4",
+              "evidence": "reasoned",
+              "text": "One language and runtime on all three OSes keeps behavior identical, covering paths, HTTP, OAuth flows and child processes. Platform differences sit in Node's built-ins, not in team-maintained per-OS code.",
+              "source": "",
+              "confidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "G-C5",
+              "evidence": "reasoned",
+              "text": "Hiring and turnover favor JS/TS. It is among the most widely known languages, 2 of 6 current developers write TypeScript, and Python and C# developers are close to it. This fits the 5-year maintenance horizon and a weekly release cadence.",
+              "source": "",
+              "confidence": 70,
+              "status": "stands"
+            },
+            {
+              "id": "G-C6",
+              "evidence": "reasoned",
+              "text": "Mature OAuth, REST and CLI-framework libraries exist on npm (commander, oclif, openid-client). A new command can usually be built from existing parts, which supports the goal of shipping a command in under a week.",
+              "source": "",
+              "confidence": 68,
+              "status": "stands"
+            },
+            {
+              "id": "G-C7",
+              "evidence": "reasoned",
+              "text": "No paid licenses are needed. Node and npm are open source. Rust has no production experience on the team, so JS/TS has far less learning risk than Rust, and its iteration speed is better than Go's or C#'s for this team.",
+              "source": "",
+              "confidence": 62,
+              "revisedConfidence": 45,
+              "status": "struck"
+            },
+            {
+              "id": "G-C8",
+              "evidence": "cited",
+              "text": "Native Node SEA is still Stability 1.1 (active development). So the strongest install path is to use a bundler such as esbuild with npm or a self-update mechanism. This risk is real but manageable, and the team controls the upgrade timing.",
+              "source": "https://nodejs.org/api/single-executable-applications.html",
+              "confidence": 72,
+              "status": "stands"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "G-W1",
+              "text": "Startup under 300 ms is unproven. Node boot is typically 40-100 ms (my prior knowledge, not sourced this session). The cache docs give no numbers, and large SEA binaries with antivirus scanning on Windows could break the budget. I ran no measurements."
+            },
+            {
+              "id": "G-W2",
+              "text": "SEA is Stability 1.1 and the docs say it is subject to change. macOS x64 is not tested, cross-builds require the same Node version and a disabled snapshot or code cache, and macOS needs codesign. The one-command, no-admin install on all 3 OSes therefore needs extra packaging work."
+            }
+          ],
+          "failedTests": [
+            "No tests were run (the rules allow none). One research lookup failed: the npm install docs page (docs.npmjs.com npm-install) did not say whether a global install works without admin rights. I could not cite that point and left it out of the claims.",
+            "No source was fetched for the Node startup-time figure, so it is not claimed as cited."
+          ]
+        },
+        {
+          "label": "D",
+          "description": "Shell scripts (Bash on macOS and Linux, PowerShell on Windows) with no compiled language.",
+          "claims": [
+            {
+              "id": "D-C1",
+              "evidence": "reasoned",
+              "text": "Distribution is nearly free. Bash ships on macOS and Linux, and PowerShell ships on Windows 11. Plain scripts need no compiler, runtime install, or admin rights, so a one-command install can be a git clone or a file copy.",
+              "source": "",
+              "confidence": 70,
+              "revisedConfidence": 45,
+              "status": "struck"
+            },
+            {
+              "id": "D-C2",
+              "evidence": "reasoned",
+              "text": "Startup cost is small for simple commands. No VM or runtime has to load, so common commands plausibly beat the 300 ms limit on macOS and Linux. Windows PowerShell startup is the risk, and I did not measure it.",
+              "source": "",
+              "confidence": 55,
+              "revisedConfidence": 35,
+              "status": "conceded"
+            },
+            {
+              "id": "D-C3",
+              "evidence": "reasoned",
+              "text": "Weekly updates are cheap. A release is a file change with no build, signing, notarization, or per-OS binaries. This removes the whole cross-compile and release-pipeline failure class.",
+              "source": "",
+              "confidence": 65,
+              "status": "stands"
+            },
+            {
+              "id": "D-C4",
+              "evidence": "reasoned",
+              "text": "Scaffolding, running local checks, and chaining other tools are shell's home turf. Most of the tool's described work is calling existing CLIs, so shell glue fits better than reimplementing them in a general-purpose language.",
+              "source": "",
+              "confidence": 65,
+              "revisedConfidence": 38,
+              "status": "struck"
+            },
+            {
+              "id": "D-C5",
+              "evidence": "reasoned",
+              "text": "Shell is the best fit for being called from other scripts. Callers already speak exit codes, stdout, and pipes, and no interpreter or runtime has to be spawned and versioned alongside the tool.",
+              "source": "",
+              "confidence": 55,
+              "status": "stands"
+            },
+            {
+              "id": "D-C6",
+              "evidence": "reasoned",
+              "text": "Hiring and turnover risk is low. Almost every engineer can read shell, so a 5-year maintenance horizon does not depend on rare skills. The 6-person team's Python, TypeScript, Go, and C# experience all transfers somewhat.",
+              "source": "",
+              "confidence": 50,
+              "status": "stands"
+            },
+            {
+              "id": "D-C7",
+              "evidence": "reasoned",
+              "text": "No licenses, no dependency on a language ecosystem, and no runtime deprecation cycle. Bash and PowerShell are stable over many years, so the long-term supply chain risk is small.",
+              "source": "",
+              "confidence": 55,
+              "status": "stands"
+            },
+            {
+              "id": "D-C8",
+              "evidence": "reasoned",
+              "text": "As the baseline, shell sets the lowest-cost floor. If a compiled language cannot clearly beat it on same-behavior-everywhere, startup time, and ship speed, the extra build and distribution machinery is not justified.",
+              "source": "",
+              "confidence": 45,
+              "status": "stands"
+            }
+          ],
+          "weaknesses": [
+            {
+              "id": "D-W1",
+              "text": "Same behavior on all 3 operating systems is a hard constraint, and Option D means two separate codebases (Bash and PowerShell) with different quoting, path handling, JSON/OAuth handling, and error semantics. Drift and Windows-only bugs will drive support tickets above the 1 per 100 users per month target."
+            },
+            {
+              "id": "D-W2",
+              "text": "OAuth token handling, JSON parsing, and robust REST calls are fragile in shell and depend on tools like curl and jq that are not guaranteed present on every OS. Testing is weak, and Windows PowerShell startup may break the 300 ms limit. I did no research or measurement, so all claims are unverified."
+            }
+          ],
+          "failedTests": []
+        }
+      ],
+      "rulings": [
+        {
+          "id": "R1",
+          "claim": "Q-C3",
+          "against": "Q",
+          "claimHolds": false,
+          "checked": "I fetched docs.rs/reqwest/latest. The current version is 0.13.5. Its TLS features are default-tls (on by default), rustls, rustls-no-provider, native-tls and the native-tls-vendored and no-alpn variants. The rustls-tls-webpki-roots and rustls-tls-native-roots features that Challenges 2 and 3 quote are not listed in 0.13, so those challenges rest on 0.12-era docs. The docs page does not say which backend default-tls selects. From prior knowledge, not checked against the changelog this session: 0.13 made rustls the default and added rustls-platform-verifier as an optional dependency. For Challenge 1 (bare rustls does not read the OS trust store), I relied on prior knowledge and the defense's concession; I fetched nothing for it.",
+          "note": "Challenges 2 and 3 are partly out of date: the reqwest 0.13 feature list no longer has the webpki-roots and native-roots features they cite, and from unverified prior knowledge 0.13 may already default to rustls. The claim still fails on 'identical behavior on macOS, Windows and Linux'. Bare rustls does not use the OS trust store, and the usual fix (rustls-platform-verifier) hands verification to each OS's own verifier, which behave differently. All three defenses concede that 'identical' is overstated."
+        },
+        {
+          "id": "R2",
+          "claim": "Q-C7",
+          "against": "Q",
+          "claimHolds": false,
+          "checked": "I read all four challenges and their defenses. Every defense concedes the hiring and onboarding half of Q-C7, so I checked whether the claim gives any support for that half. It gives only \"many engineers want to learn it\": no source, confidence 50. This goes against Q-W1 and the problem statement, which say nobody on the team has shipped production Rust. I did not fetch the Stack Overflow figures, and the ruling does not depend on them. I also checked the tooling half against what I know. cargo-dist, clap_complete and self_update are real crates, and ripgrep, uv and ruff are real Rust CLIs, so that half is reasonable. I ran no tests, because nothing here can be run.",
+          "note": "The claim does not hold as stated: all four defenses concede the hiring and onboarding half, which has no support; only the separate tooling-maturity half still stands."
+        },
+        {
+          "id": "R3",
+          "claim": "P-C5",
+          "against": "P",
+          "claimHolds": false,
+          "checked": "There was no test to re-run or source to read, because the claim is marked reasoned-only and P-W2 says no tool calls were made. I compared the claim's wording with P-W1 as all three challenges quote it, and with the three defenses. I also checked the background facts the defense gives against what I know: Go 1 really does have a formal compatibility promise, and the language has 25 keywords. Those parts are accurate. The disputed parts are the 'learn it in weeks' figure, which has no source, and the claim that this helps the under-one-week command target.",
+          "note": "All three defenses are partial: each one accepts that the claim only holds at steady state after a ramp period. That means the claim as written, which says Go helps the under-one-week command target with no time limit, fails against the same case's own P-W1 (5 of 6 developers must retrain, a bus factor of 1, and a release cadence that could slow early on) and against the unsourced 'weeks' figure."
+        },
+        {
+          "id": "R4",
+          "claim": "P-C7",
+          "against": "P",
+          "claimHolds": false,
+          "checked": "I compared the claim with both challenges and with the defender's partial concessions. The challenges quote P-W2 from the case: a running .exe cannot be replaced in place on Windows, and macOS signing and notarisation plus Windows SmartScreen and antivirus flags are unverified. Nobody ran a test or measured ticket rates, and this workspace holds nothing I could re-run.",
+          "note": "A static binary does remove runtime and virtualenv tickets, and the defender concedes that this binary format brings new ticket classes (signing and notarisation, SmartScreen and antivirus flags, self-updates on Windows) that the case leaves out of its estimate; so 'largely disappear' and the claimed help toward the under-1-per-100-users goal are untested and do not survive either challenge."
+        },
+        {
+          "id": "R5",
+          "claim": "Y-C4",
+          "against": "Y",
+          "claimHolds": false,
+          "checked": "I read both challenges and both defenses against the claim text, and compared them with the cited case evidence (Y-W1: 'Only 1 of 6 developers knows C#'). Both defenses concede the main points. Challenge 1 shows that the claim gives no support for Go or Python developers. Challenge 2 shows that the short ramp-up is not measured, and that the hard parts of the stack (.NET libraries, the async model, Native AOT trimming and reflection limits) are not covered by syntax familiarity. No ramp-up data or test exists to re-run.",
+          "note": "The claim does not hold. It covers 4 non-C# developers, but its only support is the shared designer lineage with TypeScript, so at most it holds for the 2 TypeScript developers. Both defenses concede that the Go and Python parts and the short ramp-up have no support."
+        },
+        {
+          "id": "R6",
+          "claim": "G-C2",
+          "against": "G",
+          "claimHolds": false,
+          "checked": "I fetched https://nodejs.org/api/typescript.html. It confirms that type stripping is \"Stability: 2 - Stable\" from v25.2.0 and v24.12.0. It also lists these limits. Node refuses TypeScript files under node_modules. enum, namespaces with runtime code, parameter properties and import aliases fail with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX. Decorators cause a parse error. Imports need explicit .ts extensions. tsconfig paths cause errors. Type-only imports need the `type` keyword. Node does no type checking, so tsc must run separately. The page also says --experimental-transform-types was removed in v26.0.0.",
+          "note": "The parts about native running and Stable status hold, but the unqualified \"TS developers need no build step\" does not: the cited page limits it to erasable syntax outside node_modules, all three defenses concede it is narrower than worded, and release still needs an esbuild/SEA bundle step."
+        },
+        {
+          "id": "R7",
+          "claim": "D-C1",
+          "against": "D",
+          "claimHolds": false,
+          "checked": "I ran PowerShell on this Windows 11 Enterprise laptop. $PSVersionTable reports 5.1.26100, so the shell that ships is Windows PowerShell 5.1, not PowerShell 7. Get-ExecutionPolicy -List shows LocalMachine set to AllSigned (not the out-of-box Restricted), CurrentUser set to RemoteSigned (which wins over LocalMachine), Process set to Bypass, and both Group Policy scopes Undefined. Git is installed here, but that tells us nothing about other laptops. I did not check the Bash 3.2 point on macOS; the challengers and the defender both accept it.",
+          "note": "The defender concedes part of every challenge, and the claim does not hold as written. Windows needs a separate execution-policy step before scripts run, and that step can fail on Group Policy-managed machines. Scripts must target PowerShell 5.1, git is not guaranteed, and Bash plus PowerShell means two codebases. The fair verdict is \"cheap, with caveats\", not \"nearly free\" (this machine's own policy shows one such Windows step was needed)."
+        },
+        {
+          "id": "R8",
+          "claim": "D-C4",
+          "against": "D",
+          "claimHolds": false,
+          "checked": "I compared the claim with the problem statement and D-W2 as quoted in all four challenges. The problem statement lists three core jobs: scaffold new services, run local checks, and call internal REST APIs with OAuth tokens. D-W2 says OAuth handling, JSON parsing and REST calls are fragile in shell and depend on curl and jq, which are not on every OS. D-W1 says Bash and PowerShell would be two separate codebases, while the requirement is the same behavior on 3 operating systems. All four defenses are partial, and each one concedes that the claim holds only for scaffolding and check chaining, not for the whole tool. No source or test files for this case exist locally, so I ruled on the quoted case text only.",
+          "note": "The claim says most of the tool's work is calling existing CLIs, but REST calls with OAuth are a core job, the case's own D-W2 says shell is fragile at that, and the defender conceded this in every challenge, so the claim fails."
+        },
+        {
+          "id": "R9",
+          "claim": "B-C5",
+          "against": "B",
+          "claimHolds": false,
+          "checked": "I read all five challenges and their defenses against what I know of the uv and pipx install docs. 'uv tool install' and 'uv tool upgrade' need uv on the machine first, and uv is installed by a separate standalone script, such as 'powershell -ExecutionPolicy ByPass -c \"irm https://astral.sh/uv/install.ps1 | iex\"'. pipx needs Python 3.9 or later, and a clean Windows 11 has only the Microsoft Store stub for Python. I also checked whether the problem statement provides an internal package index. It does not. All five defenses concede the two-step first install, and Defense 4 concedes the uncosted index.",
+          "note": "The claim does not hold, and the defenses concede why: a fresh machine needs two commands, first installing uv (or Python for pipx) and then the tool, and the internal package index it relies on is neither provided nor costed. Only the no-admin per-user install and the one-command update survive."
+        },
+        {
+          "id": "R10",
+          "claim": "B-C6",
+          "against": "B",
+          "claimHolds": false,
+          "checked": "I timed CPython 3.13.1 (C:\\Python313\\python.exe) cold starts on this Windows 11 Enterprise machine, using subprocess with perf_counter. A bare `python -c pass` took 135-434 ms over 8 runs, with a median of about 200 ms. With `-S` it took 330-520 ms. Importing only json, argparse and pathlib from the standard library took 297-557 ms. httpx, jinja2 and authlib are not installed here, so I could not time them, but they could only add to these numbers.",
+          "note": "The claim's premise fails. On a real Windows 11 machine with endpoint scanning, interpreter startup alone measured in the hundreds of milliseconds, not \"tens\", and it often went over 300 ms even with no third-party imports, so lazy imports cannot make the 300 ms pass/fail budget reachable."
+        },
+        {
+          "id": "R11",
+          "claim": "Y-C3",
+          "against": "Y",
+          "claimHolds": false,
+          "checked": "I compared the claim's wording, \"behavior is identical across macOS, Windows 11 and Linux\" and \"never hit environment breakage\", with Challenge 1 and the partial defense. I checked the facts against what I know of the .NET documentation; I ran no tests and fetched no pages. Two facts stand. First, .NET file I/O follows the host file system, which is case-insensitive by default on Windows and macOS and case-sensitive on Linux. Path separators and console encoding also differ by OS. Second, Microsoft's Native AOT docs say cross-OS compilation is not supported, so each OS gets its own build. The defense admits the main point: it asks to replace \"identical\" with \"no interpreter or dependency drift\" and relies on a per-OS CI test matrix (Y-C8).",
+          "note": "The narrower point stands: a compiled binary removes interpreter and dependency drift. But the defense itself concedes the claim's \"identical behavior\" and \"never\" wording, because the code still sees OS differences in paths, case sensitivity and encoding, and each OS needs its own build. So the claim as written does not survive the challenge."
+        },
+        {
+          "id": "R12",
+          "claim": "B-C4",
+          "against": "B",
+          "claimHolds": false,
+          "checked": "I downloaded the current msal (1.39.0) and authlib (1.9.5) wheels from PyPI and read their METADATA. Both are py3-none-any wheels, but both list cryptography under Requires-Dist: authlib needs cryptography>=45.0.1 and msal needs cryptography<51,>=2.5 plus PyJWT[crypto]. msal's optional broker extra also pulls pymsalruntime, which is a native package chosen per OS. cryptography ships compiled wheels tagged per platform. All 3 defenses concede this point.",
+          "note": "The claim fails as stated: the OAuth libraries it names depend on cryptography, which is compiled and installed per OS. So the install is not one pure-Python wheel that is identical on every OS. The defenders conceded this. What survives is a narrower point: upstream maintains wheels for all 3 OSes, so the risk is lower than keeping our own native build matrix."
+        },
+        {
+          "id": "R13",
+          "claim": "Y-C1",
+          "against": "Y",
+          "claimHolds": true,
+          "checked": "I compared the claim's wording with what the Microsoft .NET deployment docs say about ReadyToRun, self-contained single-file publish and Native AOT. I did not fetch or run anything. ReadyToRun does keep IL code and still needs the runtime and the JIT. When you publish it as a self-contained single file, the runtime is bundled inside the executable, so the user does not need to install .NET or have admin rights. Native AOT produces a native binary with no runtime, but you must build it on each target OS, for example with one CI runner per platform. That limits how you build it, not whether you can ship binaries for win, osx and linux.",
+          "note": "Both paths give a self-contained binary that runs on win, osx and linux with nothing installed and no admin rights, so the claim holds. ReadyToRun bundles the runtime rather than being runtime-free, which makes the file larger and startup slower but leaves the claim intact."
+        },
+        {
+          "id": "R14",
+          "claim": "G-C1",
+          "against": "G",
+          "claimHolds": true,
+          "checked": "I fetched https://nodejs.org/api/single-executable-applications.html. It marks the feature 'Stability: 1.1 - Active development'. `node --build-sea sea-config.json` builds an executable from one JSON config. Cross-platform output is documented, for example building linux-x64 on darwin-arm64. That requires the same Node version on the build host and target, and useCodeCache and useSnapshot set to false. CI tests Windows, macOS on arm64 only (x64 is 'not currently supported'), and Linux except Alpine and s390x. On macOS the binary is ad-hoc signed with `codesign --sign -`. Windows signing is optional. The page does not cover admin rights, but the output is one self-contained binary.",
+          "note": "The cited page documents the claim's capability: one JSON config, Windows, macOS and Linux targets, and builds for another OS from a build host. Both challenges show only that the feature is in active development and has limits that lower confidence, not that the claim is false. The biggest limit is that macOS x64 is unsupported, so the 'macOS' target in practice means arm64 only. Cross-builds also need the same Node version and the code cache turned off."
+        },
+        {
+          "id": "R15",
+          "claim": "P-C3",
+          "against": "P",
+          "claimHolds": true,
+          "checked": "I tried to cross-compile a net/http test program with CGO_ENABLED=0 for darwin/arm64, darwin/amd64, linux/amd64 and windows/amd64. I could not run it because Go is not installed on this machine. I then weighed the challenge against what I know of the tooling: (1) GOOS/GOARCH cross-compilation is built into the Go toolchain and needs no cgo for net/http or x/oauth2. (2) Signing and notarising on macOS do not need a Mac. GoReleaser's notarize step uses anchore/quill, and indygreg's rcodesign also runs on Linux; both sign and notarise through the App Store Connect API. (3) Keychain access works without cgo through zalando/go-keyring, which calls /usr/bin/security on macOS, D-Bus on Linux and wincred on Windows. So it cross-compiles with CGO_ENABLED=0. None of this was tested here.",
+          "note": "The claim holds, but untested. The challenge assumes notarisation and keychain access need macOS or cgo. That is not true in practice: quill and rcodesign sign and notarise from Linux, and cgo-free keyring libraries exist. So one Linux CI job can build and release for all three OSes, even though the defense gave this point away more than it needed to."
+        },
+        {
+          "id": "R16",
+          "claim": "G-C7",
+          "against": "G",
+          "claimHolds": false,
+          "checked": "I read the claim, Challenge 1 and Defense 1 side by side. G-C7 is tagged [reasoned] and cites no source. G-W1 says no measurements were run. The defense concedes the iteration-speed comparison. I did not re-check the no-license point (Node is MIT-licensed and npm is Artistic-2.0, both open source); the challenge does not dispute it. I did not re-check the lower learning risk compared with Rust; it rests on team facts that the challenge also leaves alone.",
+          "note": "The claim as stated includes \"iteration speed is better than Go's or C#'s\", which has no evidence and which the defense withdrew, so the claim does not survive the challenge as a whole; only the no-license part and the learning-risk-versus-Rust part still stand."
+        },
+        {
+          "id": "R17",
+          "claim": "Q-C1",
+          "against": "Q",
+          "claimHolds": false,
+          "checked": "I did not fetch any page or run any build. I compared the challenge's quote with my own knowledge of Microsoft's .NET deployment docs. Those docs say Native AOT produces a self-contained native executable that does not need the .NET runtime installed. They also say self-contained publish bundles the runtime into the app folder and needs no admin rights. The defense concedes the .NET point.",
+          "note": "The claim says .NET targets must install or bundle a runtime, which is hard without admin rights, but .NET Native AOT produces one native binary with no separate runtime and none of these options needs admin rights, so the claim is wrong for .NET as written and the defense concedes this."
+        },
+        {
+          "id": "R18",
+          "claim": "P-C1",
+          "against": "P",
+          "claimHolds": false,
+          "checked": "I checked the claim against the challenge and the defense's own concession. I also looked for a Go toolchain on this machine so I could build a test binary, but none is installed, so I could not run any test. The council-mode repo has no Go code or install script to read. On general knowledge: Go does produce a single binary per OS/arch with no separate runtime. A fully static binary depends on settings (for example CGO_ENABLED=0 on Linux). A binary placed in a user-writable directory needs no admin rights.",
+          "note": "The part about not needing a runtime holds, but the claim also says Go fits the one-command, no-admin install constraint, and the defense admits that no install or update path has been built or tested (P-W2, P-C8), including in-place self-update on Windows, so the claim does not survive the challenge in full."
+        },
+        {
+          "id": "R19",
+          "claim": "Y-C8",
+          "against": "Y",
+          "claimHolds": false,
+          "checked": "I compared the claim's wording with the evidence cited for the challenge and the defense, and checked it against what I know of .NET. .NET has no general self-update for a published or self-contained executable. 'dotnet tool update' only updates tools installed through the .NET SDK, so the laptop needs the SDK. Y-W2 says the team must build the installer and self-updater. The defense agrees that the word 'built-in' is wrong. I did not run any commands, because there is no test or source to run for this claim.",
+          "note": "The parts about CI matrix builds and weekly publishing hold, and a self-contained binary can replace itself, so the challenge's point about contradicting Y-C1 fails. But the claim presents the one-command, no-admin self-update as something that already exists, when the team must build it (Y-W2, and the defense agrees), so the claim does not survive as written."
+        }
+      ],
+      "concessions": [
+        {
+          "id": "X1",
+          "challenge": {
+            "from": "B",
+            "targetClaim": "Y-C8",
+            "text": "(against Y-C8) The claim says a 'built-in self-update command' gives a one-command, no-admin update. .NET has no built-in self-updater for a self-contained binary, so the team must build one. Y-W2 says so. | Evidence: Y-W2 in the same case: 'The one-command no-admin installer and self-updater must be built by the team in any language'. The same weakness says Native AOT 'cannot cross-compile', so the matrix needs a build host per OS.",
+            "evidence": "Y-W2 in the same case: 'The one-command no-admin installer and self-updater must be built by the team in any language'. The same weakness says Native AOT 'cannot cross-compile', so the matrix needs a build host per OS.",
+            "id": "CH6",
+            "against": "Y"
+          },
+          "evidence": "Y-W2 states the installer and self-updater must be built by the team. The .NET docs list no self-update feature for a published binary. A running .exe on Windows is locked, so the updater needs a helper process. Third-party libraries such as Velopack exist, but they are not built in."
+        },
+        {
+          "id": "X2",
+          "challenge": {
+            "from": "B",
+            "targetClaim": "G-C7",
+            "text": "(against G-C7) The claim that JS/TS iteration speed is 'better than Go's or C#'s for this team' has no cited source or test. Only 2 of 6 developers write TypeScript, the same count as Python, and G-W1 states no measurement was done. | Evidence: G-C7 is marked [reasoned] with confidence 62. G-W1 in the same case: 'I ran no measurements.' The problem statement says the team is 2 Python, 2 TypeScript, 1 Go and 1 C#.",
+            "evidence": "G-C7 is marked [reasoned] with confidence 62. G-W1 in the same case: 'I ran no measurements.' The problem statement says the team is 2 Python, 2 TypeScript, 1 Go and 1 C#.",
+            "id": "CH8",
+            "against": "G"
+          },
+          "evidence": "G-C7 is tagged [reasoned] with no source or measurement, and G-W1 says nothing was measured. The problem statement gives 2 Python, 2 TypeScript, 1 Go, 1 C#, so headcount does not favor JS/TS over Python. The no-license point and lower learning risk than Rust do not depend on the comparison and still stand."
+        },
+        {
+          "id": "X3",
+          "challenge": {
+            "from": "Q",
+            "targetClaim": "Y-C4",
+            "text": "(against Y-C4) The claim that C# is close to the Go developer's language, because of shared 'designer lineage' with TypeScript, does not hold for Go. TypeScript and C# share Anders Hejlsberg as lead designer. Go was designed separately by Robert Griesemer, Rob Pike and Ken Thompson. So the ramp-up argument covers at most the 2 TypeScript developers, and 3 of the other 4 developers have no C# background (Python x2, Go x1). | Evidence: Public language history: Anders Hejlsberg led C# and TypeScript (Microsoft); the Go FAQ and go.dev/doc/faq#history credit Griesemer, Pike and Thompson. The problem statement gives the team mix as 2 Python, 2 TypeScript, 1 Go, 1 C#. Y-W1 also says: 'Only 1 of 6 developers knows C#.'",
+            "evidence": "Public language history: Anders Hejlsberg led C# and TypeScript (Microsoft); the Go FAQ and go.dev/doc/faq#history credit Griesemer, Pike and Thompson. The problem statement gives the team mix as 2 Python, 2 TypeScript, 1 Go, 1 C#. Rival Y-W1 also says: 'Only 1 of 6 developers knows C#.'",
+            "id": "CH15",
+            "against": "Y"
+          },
+          "evidence": "Go was designed by Griesemer, Pike and Thompson, not Hejlsberg. The team mix is 2 Python, 2 TypeScript, 1 Go, 1 C#. Designer lineage says nothing about Go syntax or idioms."
+        },
+        {
+          "id": "X4",
+          "challenge": {
+            "from": "Q",
+            "targetClaim": "G-C7",
+            "text": "(against G-C7) The claim that iteration speed is 'better than Go's or C#'s for this team' has no data. Only 2 of 6 developers write TypeScript, which is the same headcount as Python. The case's own weaknesses add packaging work, which conflicts with the claim. | Evidence: The problem statement gives the team mix as 2 Python, 2 TypeScript, 1 Go, 1 C#. G-W2 states: 'SEA is Stability 1.1... The one-command, no-admin install on all 3 OSes therefore needs extra packaging work.' G-W1 says nothing was measured.",
+            "evidence": "The problem statement gives the team mix as 2 Python, 2 TypeScript, 1 Go, 1 C#. G-W2 states: 'SEA is Stability 1.1... The one-command, no-admin install on all 3 OSes therefore needs extra packaging work.' G-W1 says nothing was measured.",
+            "id": "CH18",
+            "against": "G"
+          },
+          "evidence": "G-C7 is [reasoned] with no measurement; G-W1 says none was run; G-W2 states the install path needs extra packaging work, which offsets any speed gain; the team has 2 TS and 2 Python developers. No case evidence supports 'better than Go's or C#'s'."
+        },
+        {
+          "id": "X5",
+          "challenge": {
+            "from": "P",
+            "targetClaim": "G-C7",
+            "text": "(against G-C7) The statement that JS/TS iteration speed is better than Go's or C#'s for this team has no source or data. Only 2 of 6 developers write TypeScript. Python developers are 2 of 6 too, and the claim gives no reason why they would be faster in JS than in Python. The claim also does not count the cost of the packaging work that G-W2 and G-C8 describe. | Evidence: The problem statement gives the team as 2 Python, 2 TypeScript, 1 Go and 1 C#. G-C7 is labelled [reasoned] and cites no measurement. G-W2 says the install path 'needs extra packaging work', which reduces any iteration-speed gain.",
+            "evidence": "The problem statement gives the team as 2 Python, 2 TypeScript, 1 Go and 1 C#. G-C7 is labelled [reasoned] and cites no measurement. G-W2 says the install path 'needs extra packaging work', which reduces any iteration-speed gain.",
+            "id": "CH28",
+            "against": "G"
+          },
+          "evidence": "G-C7 is [reasoned] with no measurement. The problem statement gives 2 Python developers, the same count as TypeScript, and the claim gives no reason they would be faster in JS. G-W2 and G-C8 describe packaging work the claim did not count against iteration speed."
+        },
+        {
+          "id": "X6",
+          "challenge": {
+            "from": "Y",
+            "targetClaim": "P-C6",
+            "text": "(against P-C6) The claim treats one Go developer as a way to lower ramp-up risk. P-W1 says the bus factor on idiomatic Go is 1 and that 5 of the 6 developers must retrain, so the knowledge silo is the same size as in any single-expert option. Rust being worse does not show that Go meets the under-one-week command target. | Evidence: Quoted from P-W1: 'Only 1 of 6 developers writes Go, so 5 must retrain, and the bus factor on idiomatic Go is 1. The weekly release cadence could slow early on.' Problem statement: team has 'Go: 1' developer out of 6.",
+            "evidence": "Quoted from P-W1: 'Only 1 of 6 developers writes Go, so 5 must retrain, and the bus factor on idiomatic Go is 1. The weekly release cadence could slow early on.' Problem statement: team has 'Go: 1' developer out of 6.",
+            "id": "CH36",
+            "against": "P"
+          },
+          "evidence": "P-W1 itself states the bus factor on idiomatic Go is 1, and the team table shows Go: 1 of 6. One reviewer is the same silo size as in any single-expert option. P-C6 shows only that Go has lower ramp-up risk than Rust, which has zero experienced people. It does not show that Go meets the one-week target."
+        },
+        {
+          "id": "X7",
+          "challenge": {
+            "from": "Y",
+            "targetClaim": "D-C2",
+            "text": "(against D-C2) The claim says common commands plausibly beat 300 ms, but the claim also says Windows PowerShell startup is the risk and was not measured. 300 ms is a hard constraint on all 3 OSes, and D-W2 repeats that PowerShell startup may break it. A claim with no measurement does not show that a hard constraint is met. | Evidence: Quoted from D-C2: 'Windows PowerShell startup is the risk, and I did not measure it.' Quoted from D-W2: 'Windows PowerShell startup may break the 300 ms limit. I did no research or measurement, so all claims are unverified.'",
+            "evidence": "Quoted from D-C2: 'Windows PowerShell startup is the risk, and I did not measure it.' Quoted from D-W2: 'Windows PowerShell startup may break the 300 ms limit. I did no research or measurement, so all claims are unverified.'",
+            "id": "CH40",
+            "against": "D"
+          },
+          "evidence": "The challenge quotes D-C2 and D-W2 accurately: I did no measurement, and Windows PowerShell startup is the risk. A hard constraint cannot be shown met by an unmeasured claim. Windows PowerShell 5.1 startup is commonly reported in the hundreds of ms, which is recalled and not fetched."
+        },
+        {
+          "id": "X8",
+          "challenge": {
+            "from": "G",
+            "targetClaim": "Y-C4",
+            "text": "(against Y-C4) The claim says the 'same language designer lineage' makes C# familiar to the TypeScript developers and the Go developer. That holds for TypeScript but not for Go. | Evidence: Anders Hejlsberg led the design of C# and TypeScript. Go was designed by Robert Griesemer, Rob Pike and Ken Thompson at Google (https://go.dev/doc/faq#history). Go's syntax and idioms (no classes, explicit errors) differ from C#. Y-W1 also says only 1 of 6 knows C#.",
+            "evidence": "Anders Hejlsberg led the design of C# and TypeScript. Go was designed by Robert Griesemer, Rob Pike and Ken Thompson at Google (https://go.dev/doc/faq#history). Go's syntax and idioms (no classes, explicit errors) differ from C#. Y-W1 also says only 1 of 6 knows C#.",
+            "id": "CH47",
+            "against": "Y"
+          },
+          "evidence": "Hejlsberg led C# and TypeScript. Go was designed by Griesemer, Pike and Thompson (go.dev/doc/faq#history). Go has no classes and uses explicit error returns, so its idioms differ from C#."
+        },
+        {
+          "id": "X9",
+          "challenge": {
+            "from": "D",
+            "targetClaim": "Y-C8",
+            "text": "(against Y-C8) The claim says a built-in self-update command gives the one-command no-admin update. .NET has no built-in self-update for a published app. The team would build it or adopt a third-party library such as Velopack. On Windows a running .exe is locked and cannot be overwritten in place, so the updater needs a separate helper process. The claim describes work the team must build as built in. Y-W2 states the installer and self-updater must be built by the team, so the claim conflicts with its own case's weakness. | Evidence: Microsoft's .NET single-file and Native AOT deployment docs (learn.microsoft.com/dotnet/core/deploying/) describe publishing only and list no updater feature. ClickOnce, the Microsoft-supplied updater, applies to Windows desktop apps and not to cross-platform console tools. Velopack (docs.velopack.io) is a third-party project that supplies updating.",
+            "evidence": "Microsoft's .NET single-file and Native AOT deployment docs (learn.microsoft.com/dotnet/core/deploying/) describe publishing only and list no updater feature. ClickOnce, the Microsoft-supplied updater, applies to Windows desktop apps and not to cross-platform console tools. Velopack (docs.velopack.io) is a third-party project that supplies updating.",
+            "id": "CH53",
+            "against": "Y"
+          },
+          "evidence": "The .NET deployment docs list no updater. ClickOnce does not apply to cross-platform console tools. Velopack is third-party. A running .exe on Windows is locked, so an update needs a helper process or a rename trick. Y-W2 already says the team must build it."
+        }
+      ],
+      "voided": [],
+      "unanswered": [],
+      "drops": [],
+      "flips": [
+        {
+          "label": "B",
+          "challenged": 10,
+          "conceded": 0,
+          "adverse": 3,
+          "warnings": [
+            "stubbornness"
+          ]
+        },
+        {
+          "label": "Q",
+          "challenged": 8,
+          "conceded": 0,
+          "adverse": 3,
+          "warnings": [
+            "stubbornness"
+          ]
+        },
+        {
+          "label": "P",
+          "challenged": 8,
+          "conceded": 1,
+          "adverse": 3,
+          "warnings": []
+        },
+        {
+          "label": "Y",
+          "challenged": 9,
+          "conceded": 4,
+          "adverse": 3,
+          "warnings": []
+        },
+        {
+          "label": "G",
+          "challenged": 9,
+          "conceded": 3,
+          "adverse": 2,
+          "warnings": []
+        },
+        {
+          "label": "D",
+          "challenged": 10,
+          "conceded": 1,
+          "adverse": 2,
+          "warnings": []
+        }
+      ]
+    },
+    "rejectedChallenges": [],
+    "result": {
+      "method": "condorcet",
+      "winner": "P",
+      "tied": [],
+      "pairwise": {
+        "B": {
+          "B": 0,
+          "Q": 2,
+          "P": 0,
+          "Y": 1,
+          "G": 2,
+          "D": 6
+        },
+        "Q": {
+          "B": 5,
+          "Q": 0,
+          "P": 0,
+          "Y": 2,
+          "G": 4,
+          "D": 6
+        },
+        "P": {
+          "B": 7,
+          "Q": 7,
+          "P": 0,
+          "Y": 7,
+          "G": 5,
+          "D": 7
+        },
+        "Y": {
+          "B": 6,
+          "Q": 5,
+          "P": 0,
+          "Y": 0,
+          "G": 4,
+          "D": 7
+        },
+        "G": {
+          "B": 5,
+          "Q": 3,
+          "P": 2,
+          "Y": 3,
+          "G": 0,
+          "D": 6
+        },
+        "D": {
+          "B": 1,
+          "Q": 1,
+          "P": 0,
+          "Y": 0,
+          "G": 1,
+          "D": 0
+        }
+      },
+      "borda": {
+        "B": 11,
+        "Q": 17,
+        "P": 33,
+        "Y": 22,
+        "G": 19,
+        "D": 3
+      },
+      "fragile": false,
+      "unacceptableVotes": 0,
+      "voters": 7
+    },
+    "citations": [
+      {
+        "id": "D-W1",
+        "voters": 7
+      },
+      {
+        "id": "R9",
+        "voters": 7
+      },
+      {
+        "id": "R15",
+        "voters": 6
+      },
+      {
+        "id": "R7",
+        "voters": 6
+      },
+      {
+        "id": "R12",
+        "voters": 6
+      },
+      {
+        "id": "X1",
+        "voters": 5
+      },
+      {
+        "id": "Y-W2",
+        "voters": 5
+      },
+      {
+        "id": "R13",
+        "voters": 5
+      },
+      {
+        "id": "R14",
+        "voters": 5
+      },
+      {
+        "id": "G-C8",
+        "voters": 5
+      },
+      {
+        "id": "P-C4",
+        "voters": 5
+      },
+      {
+        "id": "Q-W1",
+        "voters": 5
+      },
+      {
+        "id": "Y-C1",
+        "voters": 4
+      },
+      {
+        "id": "G-C1",
+        "voters": 4
+      },
+      {
+        "id": "R10",
+        "voters": 4
+      },
+      {
+        "id": "G-C6",
+        "voters": 4
+      },
+      {
+        "id": "G-W2",
+        "voters": 4
+      },
+      {
+        "id": "D-W2",
+        "voters": 4
+      },
+      {
+        "id": "R8",
+        "voters": 4
+      },
+      {
+        "id": "B-W1",
+        "voters": 4
+      },
+      {
+        "id": "P-C2",
+        "voters": 3
+      },
+      {
+        "id": "Q-C2",
+        "voters": 3
+      },
+      {
+        "id": "R19",
+        "voters": 3
+      },
+      {
+        "id": "G-W1",
+        "voters": 3
+      },
+      {
+        "id": "G-C5",
+        "voters": 3
+      },
+      {
+        "id": "P-W1",
+        "voters": 3
+      },
+      {
+        "id": "P-C3",
+        "voters": 3
+      },
+      {
+        "id": "Y-W1",
+        "voters": 3
+      },
+      {
+        "id": "R2",
+        "voters": 3
+      },
+      {
+        "id": "R17",
+        "voters": 3
+      },
+      {
+        "id": "R11",
+        "voters": 3
+      },
+      {
+        "id": "Q-W2",
+        "voters": 2
+      },
+      {
+        "id": "Q-C8",
+        "voters": 2
+      },
+      {
+        "id": "Y-C2",
+        "voters": 2
+      },
+      {
+        "id": "X9",
+        "voters": 2
+      },
+      {
+        "id": "D-C3",
+        "voters": 2
+      },
+      {
+        "id": "X7",
+        "voters": 2
+      },
+      {
+        "id": "R3",
+        "voters": 2
+      },
+      {
+        "id": "R5",
+        "voters": 2
+      },
+      {
+        "id": "B-C3",
+        "voters": 2
+      },
+      {
+        "id": "Q-C5",
+        "voters": 2
+      },
+      {
+        "id": "B-C2",
+        "voters": 2
+      },
+      {
+        "id": "Y-C5",
+        "voters": 2
+      },
+      {
+        "id": "Y-C7",
+        "voters": 2
+      },
+      {
+        "id": "Q-C4",
+        "voters": 2
+      },
+      {
+        "id": "B-C7",
+        "voters": 2
+      },
+      {
+        "id": "Y-C6",
+        "voters": 2
+      },
+      {
+        "id": "R1",
+        "voters": 2
+      },
+      {
+        "id": "Q-C3",
+        "voters": 2
+      },
+      {
+        "id": "Q-C6",
+        "voters": 2
+      },
+      {
+        "id": "G-C4",
+        "voters": 2
+      },
+      {
+        "id": "P-C1",
+        "voters": 1
+      },
+      {
+        "id": "R18",
+        "voters": 1
+      },
+      {
+        "id": "G-C3",
+        "voters": 1
+      },
+      {
+        "id": "D-C2",
+        "voters": 1
+      },
+      {
+        "id": "X6",
+        "voters": 1
+      },
+      {
+        "id": "B-C1",
+        "voters": 1
+      },
+      {
+        "id": "D-C6",
+        "voters": 1
+      },
+      {
+        "id": "Q-C7",
+        "voters": 1
+      },
+      {
+        "id": "P-C8",
+        "voters": 1
+      },
+      {
+        "id": "D-C7",
+        "voters": 1
+      },
+      {
+        "id": "P-W2",
+        "voters": 1
+      },
+      {
+        "id": "Y-C8",
+        "voters": 1
+      },
+      {
+        "id": "Q-C1",
+        "voters": 1
+      },
+      {
+        "id": "B-C8",
+        "voters": 1
+      },
+      {
+        "id": "D-C1",
+        "voters": 1
+      },
+      {
+        "id": "B-C4",
+        "voters": 1
+      }
+    ],
+    "ballots": [
+      {
+        "persona": "Everyday engineer user",
+        "model": "haiku",
+        "ranking": [
+          "P",
+          "Q",
+          "Y",
+          "G",
+          "D",
+          "B"
+        ],
+        "reasons": [
+          {
+            "higher": "P",
+            "lower": "Q",
+            "reason": "Both give a native single binary with no runtime to manage and a fast start, so this is a close call. Go edges ahead on the criteria because its cross-OS release path is cheap and the no-admin single-binary point survives (R18), while Rust's install and signing work is flagged as unresolved (Q-W2) and its install claim is not ruled on. Go's startup is still unmeasured (P-W2).",
+            "cites": [
+              "P-C2",
+              "P-C1",
+              "R18",
+              "Q-C2",
+              "Q-W2",
+              "R15"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "Y",
+            "reason": "Both start fast and ship one binary, and Y's startup claim stands (Y-C2). Q ranks higher because Y's one-command self-update does not exist (R19, X1, X9): the team must build the updater, which Y-W2 confirms. Q's update and signing burden is listed as a weakness (Q-W2) but not refuted.",
+            "cites": [
+              "Q-C2",
+              "Q-C8",
+              "Y-C2",
+              "R19",
+              "X1",
+              "X9",
+              "Y-W2"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "G",
+            "reason": "Both give a one-file binary with no runtime for the user, and both accept a larger download. Y ranks higher on the first criterion because its fast-start claim stands unchallenged (Y-C2), while G's startup is unproven and its cache lever gives no figures (G-W1, G-C3). Install is similar: R13 holds for Y and R14 for G, and both need an update mechanism that is not yet built.",
+            "cites": [
+              "Y-C2",
+              "Y-C1",
+              "R13",
+              "G-W1",
+              "G-C3",
+              "G-C1",
+              "R14",
+              "G-C8"
+            ]
+          },
+          {
+            "higher": "G",
+            "lower": "D",
+            "reason": "G ships one self-contained binary with no Node runtime for the user (R14, G-C1), and its install is a documented capability even if packaging is still work (G-C8). D's cheap updates (D-C3) are a real plus, but its install needs a PowerShell execution-policy step that can fail on managed machines (R7), its startup on Windows is unmeasured (X7), and two codebases mean drift and inconsistent errors (D-W1).",
+            "cites": [
+              "R14",
+              "G-C1",
+              "G-C8",
+              "D-C3",
+              "R7",
+              "X7",
+              "D-W1"
+            ]
+          },
+          {
+            "higher": "D",
+            "lower": "B",
+            "reason": "B needs uv or Python installed before the tool, which is the runtime the user rejects, and its install claim fails (R9). B also measured above the 300 ms start budget on Windows 11 (R10), a hard constraint. D's startup risk is unmeasured (D-C2, X7), and its updates are cheap (D-C3), so it fits the criteria better.",
+            "cites": [
+              "R9",
+              "R10",
+              "D-C3",
+              "X7",
+              "D-C2"
+            ]
+          }
+        ],
+        "flipCondition": "My ranking changes if a measured cold start under 300 ms on Windows 11 is shown for Node SEA or for shell, which would move G or D above Y or B respectively. It would also change if Go or Rust self-update or signing on Windows is shown to need admin rights, which would drop P and Q below Y and G.",
+        "unacceptable": [
+          "B"
+        ],
+        "hybrid": ""
+      },
+      {
+        "persona": "Platform team maintainer",
+        "model": "sonnet",
+        "ranking": [
+          "G",
+          "P",
+          "Y",
+          "B",
+          "Q",
+          "D"
+        ],
+        "reasons": [
+          {
+            "higher": "G",
+            "lower": "P",
+            "reason": "G has two TypeScript developers plus mature npm CLI and OAuth libraries, so new commands ship fastest and the codebase is not a one-person silo. P has only one Go developer and five must retrain. G's SEA packaging risk and startup uncertainty are real but accepted as build complexity.",
+            "cites": [
+              "G-C6",
+              "G-C5",
+              "G-C8",
+              "G-W2",
+              "P-W1",
+              "R3",
+              "X6"
+            ]
+          },
+          {
+            "higher": "P",
+            "lower": "Y",
+            "reason": "Go has a small stdlib-heavy dependency set, built-in cross-compilation (ruled to hold), and built-in test tooling. C# has the same one-person silo, and its ramp-up claim and built-in self-update claim were struck.",
+            "cites": [
+              "P-C4",
+              "P-C3",
+              "R15",
+              "Y-W1",
+              "R5",
+              "R19",
+              "X1"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "B",
+            "reason": "C# gives a self-contained binary with no runtime install, and its Native AOT startup claim stands. Python was measured over 300 ms on a Windows laptop with no third-party imports, and its install path needs a second bootstrap step and cryptography wheels.",
+            "cites": [
+              "Y-C1",
+              "R13",
+              "Y-C2",
+              "R10",
+              "R9",
+              "R12"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "Q",
+            "reason": "Python still has two daily users and fast iteration for commands. Rust has no production experience on the team, so the first-week-command target is at real risk and the hiring claim was struck.",
+            "cites": [
+              "B-C1",
+              "B-C3",
+              "Q-W1",
+              "R2",
+              "R17"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "D",
+            "reason": "Rust offers strong compile-time checks and a single binary with fast startup. Shell means two codebases with weak testing and fragile OAuth and JSON handling, which fails the same-behavior constraint.",
+            "cites": [
+              "Q-C2",
+              "Q-C5",
+              "D-W1",
+              "D-W2",
+              "R8",
+              "R7"
+            ]
+          }
+        ],
+        "flipCondition": "my ranking changes if a measured Node SEA or bundled build on a Windows 11 laptop with endpoint scanning exceeds 300 ms for common commands (Go would move first), or if the team commits to Go training with at least two reviewers (Go would move first).",
+        "unacceptable": [
+          "D"
+        ],
+        "hybrid": "TypeScript for fast iteration on commands, bundled with esbuild into a single executable, and Go only if startup measurements fail the 300 ms budget."
+      },
+      {
+        "persona": "Future new hire",
+        "model": "sonnet",
+        "ranking": [
+          "G",
+          "P",
+          "B",
+          "Y",
+          "D",
+          "Q"
+        ],
+        "reasons": [
+          {
+            "higher": "G",
+            "lower": "P",
+            "reason": "JS/TS has the largest hiring pool and excellent docs, and readable code. Its docs are cited, and the surviving claims on libraries and hiring remain. Go has the smaller pool and 5 of 6 developers must retrain.",
+            "cites": [
+              "G-C5",
+              "G-C6",
+              "G-C1",
+              "P-W1",
+              "R3"
+            ]
+          },
+          {
+            "higher": "P",
+            "lower": "B",
+            "reason": "Go is small, conventional and readable, with stdlib-heavy code. Python would be equally readable, but its startup was measured over 300 ms and its install needs a two-step bootstrap. That would push toward a rewrite later.",
+            "cites": [
+              "P-C4",
+              "P-C2",
+              "R10",
+              "R9",
+              "R12"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "Y",
+            "reason": "Python is more readable with a far bigger pool and better examples than C#. C# has weaker ramp-up evidence and its self-update must be built by the team.",
+            "cites": [
+              "B-C2",
+              "B-C3",
+              "Y-W1",
+              "R5",
+              "X1"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "D",
+            "reason": "C# is one readable, typed codebase with a decent pool. Shell means two separate codebases that drift and fragile OAuth and JSON handling, which hurts readability and maintenance.",
+            "cites": [
+              "Y-C5",
+              "Y-C7",
+              "D-W1",
+              "D-W2",
+              "R8"
+            ]
+          },
+          {
+            "higher": "D",
+            "lower": "Q",
+            "reason": "Shell is readable by almost anyone, but Rust needs specialist knowledge that nobody on the team has. That is rejected outright under my criteria.",
+            "cites": [
+              "D-C6",
+              "Q-W1",
+              "R2",
+              "Q-C7"
+            ]
+          }
+        ],
+        "flipCondition": "my ranking changes if Python startup on a managed Windows laptop is measured under 300 ms with real dependencies and a one-command no-admin install is shown to work, which would put B first; or if Node SEA startup is measured over 300 ms, which would drop G below P.",
+        "unacceptable": [
+          "Q"
+        ],
+        "hybrid": ""
+      },
+      {
+        "persona": "Release engineer",
+        "model": "opus",
+        "ranking": [
+          "P",
+          "Q",
+          "Y",
+          "G",
+          "B",
+          "D"
+        ],
+        "reasons": [
+          {
+            "higher": "P",
+            "lower": "Q",
+            "reason": "Go best fits my top criterion. R15 rules that P-C3 holds: one CI job cross-compiles for all 3 OSes with GOOS/GOARCH, and macOS signing and notarisation run from Linux (quill, rcodesign), so no per-OS build machine is needed. Rust can also release from one pipeline (Q-C4), but it usually uses a runner matrix, and Q-W2 lists signing and notarisation as extra work. Q-W1 adds delivery risk to the weekly cadence.",
+            "cites": [
+              "P-C3",
+              "R15",
+              "Q-C4",
+              "Q-W2",
+              "Q-W1"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "Y",
+            "reason": "Rust gives a tiny native binary (Q-C8) and a well-trodden one-pipeline release path (Q-C4). C# Native AOT cannot cross-compile (Y-W2, R11), so each OS needs its own build runner. R13 notes that the ReadyToRun fallback bundles the runtime, which gives larger artifacts. Both options carry similar signing friction.",
+            "cites": [
+              "Q-C8",
+              "Q-C4",
+              "Y-W2",
+              "R11",
+              "R13"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "G",
+            "reason": "C# yields a self-contained signed binary on all 3 OSes (Y-C1, R13), and a CI runner matrix is acceptable because the runners are not kept by hand. Node SEA can cross-build (R14), but it is Stability 1.1 (G-C8), macOS x64 is unsupported, cross-builds must turn the code cache off, and macOS gets only ad-hoc signing by default. G-W1 also flags large SEA binaries. That makes Node a less reproducible release target with bigger artifacts.",
+            "cites": [
+              "Y-C1",
+              "R13",
+              "R14",
+              "G-C8",
+              "G-W1",
+              "G-W2"
+            ]
+          },
+          {
+            "higher": "G",
+            "lower": "B",
+            "reason": "Node at least produces a single shippable executable from one config (G-C1, R14). Python's claim of one pure wheel, identical on every OS, failed: cryptography is compiled per OS (R12). Its install also needs a separate uv or Python bootstrap (R9, B-W1), so the release artifact is not self-contained. Python's small CI (B-C7) does not offset that.",
+            "cites": [
+              "G-C1",
+              "R14",
+              "R12",
+              "R9",
+              "B-W1",
+              "B-C7"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "D",
+            "reason": "Python ships one codebase, with upstream-maintained per-OS wheels (R12). Shell means two separate codebases (D-W1). On Windows, script execution policy can require signed scripts (R7, AllSigned seen). This gives no reproducible build artifact, and the scripts need a different signing scheme on each OS.",
+            "cites": [
+              "R12",
+              "D-W1",
+              "R7",
+              "D-C3"
+            ]
+          }
+        ],
+        "flipCondition": "My ranking changes if a ruling showed that Go cannot sign and notarise macOS binaries from a single Linux CI job (reversing R15), which would put Go level with Rust's runner matrix. It also changes if Node SEA reached Stable and supported macOS x64 with small artifacts, which would lift G above Y.",
+        "unacceptable": [
+          "D"
+        ],
+        "hybrid": ""
+      },
+      {
+        "persona": "Security engineer",
+        "model": "opus",
+        "ranking": [
+          "P",
+          "Y",
+          "Q",
+          "B",
+          "D",
+          "G"
+        ],
+        "reasons": [
+          {
+            "higher": "P",
+            "lower": "Y",
+            "reason": "Go's standard library covers HTTP, TLS, JSON, and process execution. Only a few dependencies remain (cobra, x/oauth2), and the module proxy plus checksums keeps the tree small and pinned. One Linux CI job cross-compiles for all OSes, which makes urgent toolchain patches fast. C# also has a small dependency tree, but Native AOT needs a separate build on each OS, which slows emergency patch releases.",
+            "cites": [
+              "P-C4",
+              "P-C8",
+              "R15",
+              "R11",
+              "Y-W2"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "Q",
+            "reason": "C#'s BCL and Microsoft's identity library cover REST and OAuth with little third-party code. Planned LTS releases give a predictable patch cadence. Rust is memory-safe too, but it relies on a deeper crate tree (reqwest, rustls, oauth2) with feature churn between versions. The team's lack of Rust experience would also slow security fixes.",
+            "cites": [
+              "Y-C5",
+              "Y-C6",
+              "R1",
+              "Q-C3",
+              "Q-W1"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "B",
+            "reason": "Rust gives a memory-safe, self-contained binary with no runtime drift. Python's OAuth libraries pull in the compiled cryptography package for each OS. Its first install also relies on a piped remote install script plus an internal package index that nobody has costed. That means a wider and less controlled dependency surface.",
+            "cites": [
+              "Q-C6",
+              "R17",
+              "R12",
+              "R9",
+              "B-W1"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "D",
+            "reason": "Shell handling of OAuth tokens and JSON is fragile. It depends on curl and jq, which may not be present on every OS. On Windows, scripts also need execution-policy changes that can fail under Group Policy. Mishandled tokens are a direct security risk. Python can at least pin its dependency tree and hand OAuth to a library that can be audited.",
+            "cites": [
+              "D-W2",
+              "R8",
+              "R7",
+              "D-W1"
+            ]
+          },
+          {
+            "higher": "D",
+            "lower": "G",
+            "reason": "Shell scripts have no package-ecosystem dependency tree. Node's case rests on assembling commands from many npm packages, the deepest and least audited tree of all the options. Its single-executable feature is still in active development, which adds toolchain instability.",
+            "cites": [
+              "D-C7",
+              "G-C6",
+              "G-C8",
+              "R14"
+            ]
+          }
+        ],
+        "flipCondition": "My ranking changes if the team shows that Rust's crate tree can be kept small, pinned, and audited (for example with cargo-vet or cargo-deny) and that someone can ship Rust patches quickly. In that case Rust would rise above C#. My ranking also changes if Go's real dependency tree turns out much larger than P-C4 claims.",
+        "unacceptable": [
+          "G"
+        ],
+        "hybrid": "Go with a minimal, pinned dependency set (stdlib plus x/oauth2, with go.sum checked in CI and govulncheck run on every release), released as signed binaries from a single cross-compile pipeline."
+      },
+      {
+        "persona": "Developer-experience support lead",
+        "model": "haiku",
+        "ranking": [
+          "P",
+          "G",
+          "Y",
+          "Q",
+          "B",
+          "D"
+        ],
+        "reasons": [
+          {
+            "higher": "P",
+            "lower": "G",
+            "reason": "Go gives one source tree built into one binary per OS from one CI job with no runtime on the user's machine, so the same code path runs everywhere. The ruling says cross-compiling and signing can be done from Linux, which keeps per-OS work in CI and off the laptops. Node's single-executable path is still Stability 1.1, lacks macOS x64 support, and needs matching Node versions for cross-builds, which adds packaging risk that can surface as support tickets. The cost is that Go's install and self-update path is unbuilt and Windows in-place replacement is unresolved, so P is only slightly ahead.",
+            "cites": [
+              "R15",
+              "P-C3",
+              "P-C4",
+              "P-W2",
+              "G-C4",
+              "G-C1",
+              "R14",
+              "G-W2"
+            ]
+          },
+          {
+            "higher": "G",
+            "lower": "Y",
+            "reason": "Node runs the same engine and the same JavaScript on all three OSes (G-C4), and the cited SEA docs show one JSON config building for other OSes (G-C1, R14). Y's self-contained build cannot cross-compile, so each OS needs its own build (R11, R13). Y's own self-updater has to be built by the team (Y-W2, Y-C8 conceded in X1), which is more per-OS work for my support criteria. Node's SEA limits are real (G-W2), so the gap is moderate, not large.",
+            "cites": [
+              "G-C4",
+              "G-C1",
+              "R14",
+              "G-W2",
+              "R11",
+              "R13",
+              "Y-C1",
+              "Y-C8",
+              "X1",
+              "Y-W2"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "Q",
+            "reason": "Y-C1 holds (R13): both ReadyToRun and self-contained publish give a binary with no runtime install and no admin rights on each OS. Q-C3 failed on its 'identical behavior' claim (R1): bare rustls does not read the OS trust store, and rustls-platform-verifier hands verification to each OS's own verifier, which behaves differently. Y's narrower file-system and encoding differences (R11) also exist, but they are common to every compiled option. Q's exhaustive error types (Q-C5) help actionable messages, but that is not enough to outrank Y on the OS-consistency criterion.",
+            "cites": [
+              "Y-C1",
+              "R13",
+              "R11",
+              "Q-C3",
+              "R1",
+              "Q-C5"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "B",
+            "reason": "Q produces one native binary with no runtime (Q-C1 with the R17 correction to the .NET claim, which does not apply here), so install never depends on a machine-specific interpreter. B's Python install needs a bootstrap of uv or Python on each laptop, and R9 showed that step is not one command. That is a per-machine fix, which the criteria reject. B-C8 suggests Python tracebacks help users, but that is a weak support gain against the bootstrap failure class.",
+            "cites": [
+              "Q-C1",
+              "R17",
+              "Q-C6",
+              "B-W1",
+              "R9",
+              "B-C8"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "D",
+            "reason": "D's two separate codebases, Bash and PowerShell, are the main way to lose same-behavior-on-3-OSes (D-W1), which is the top criterion. R7 shows a Windows execution-policy step that already needs per-machine handling on this laptop, which is the rejected class. B still has a bootstrap cost (B-W1), but it is one codebase and one interpreter, and it avoids the cross-shell drift that drives tickets.",
+            "cites": [
+              "D-W1",
+              "R7",
+              "D-C1",
+              "B-W1",
+              "R12",
+              "B-C4"
+            ]
+          }
+        ],
+        "flipCondition": "My ranking changes if a measured test shows Go's install or self-update on Windows needs a per-machine fix that CI cannot remove, which would move P below G; or if Node SEA builds for all three OSes from one CI job with signing and no per-machine steps, which would move G above P; or if Y's builds show a cross-OS behavior gap smaller than Q's TLS-trust gap, which would put Y above P.",
+        "unacceptable": [
+          "D"
+        ],
+        "hybrid": ""
+      },
+      {
+        "persona": "Engineering manager (5-year owner)",
+        "model": "sonnet",
+        "ranking": [
+          "P",
+          "Y",
+          "Q",
+          "B",
+          "G",
+          "D"
+        ],
+        "reasons": [
+          {
+            "higher": "P",
+            "lower": "Y",
+            "reason": "Go gives the same compiled-binary benefits with one-job cross-compilation (R15 holds), while C# Native AOT needs a per-OS build matrix and a self-updater the team must build (R19, X1, X9). Go 1 compatibility is a strong 5-year support signal and the stdlib keeps dependencies low (P-C4). Both start with one experienced developer (P-W1, Y-W1), so staffing risk is equal, but Go has the lower build and ownership cost.",
+            "cites": [
+              "R15",
+              "P-C4",
+              "P-C2",
+              "R19",
+              "X1",
+              "X9",
+              "Y-W2",
+              "P-W1",
+              "Y-W1"
+            ]
+          },
+          {
+            "higher": "Y",
+            "lower": "Q",
+            "reason": "C# has one in-house expert and a larger hiring pool than Rust, and its LTS cadence covers five years (Y-C6, Y-C7). Rust has nobody with production experience, so turnover hits harder and the one-week command target is at real risk (Q-W1). Rust's hiring claim was conceded for lack of support (R2).",
+            "cites": [
+              "Y-C6",
+              "Y-C7",
+              "R13",
+              "Q-W1",
+              "R2"
+            ]
+          },
+          {
+            "higher": "Q",
+            "lower": "B",
+            "reason": "Rust's toolchain and release path are stable and compiled, and it meets the 300 ms budget with room to spare (Q-C2, Q-C4). Python measurably failed the startup constraint on Windows (R10), needs a two-step bootstrap install (R9), and its OAuth stack pulls in per-OS compiled wheels (R12). Python's staffing advantage (B-C2) does not offset failing hard constraints. That would mean ongoing tickets and a higher total cost of ownership.",
+            "cites": [
+              "Q-C2",
+              "Q-C4",
+              "R10",
+              "R9",
+              "R12",
+              "B-C2",
+              "B-W1"
+            ]
+          },
+          {
+            "higher": "B",
+            "lower": "G",
+            "reason": "Python's toolchain is mature and low-risk over five years, with strong staffing. Node's single-executable path is Stability 1.1, still in active development, with macOS x64 unsupported and cross-builds restricted (R14, G-C8, G-W2). That is exactly the uncertain five-year support I reject, and Node's startup is also unproven (G-W1).",
+            "cites": [
+              "R14",
+              "G-C8",
+              "G-W2",
+              "G-W1",
+              "B-C7",
+              "B-C2"
+            ]
+          },
+          {
+            "higher": "G",
+            "lower": "D",
+            "reason": "JS/TS gives one codebase, a large hiring pool and mature OAuth libraries (G-C4, G-C5, G-C6). Shell means two codebases with drift on a hard same-behavior constraint, plus fragile OAuth handling (D-W1, D-W2, R8). Its distribution is also not nearly free (R7), and its startup claim was conceded (X7).",
+            "cites": [
+              "G-C4",
+              "G-C5",
+              "G-C6",
+              "D-W1",
+              "D-W2",
+              "R8",
+              "R7",
+              "X7"
+            ]
+          }
+        ],
+        "flipCondition": "my ranking changes if a measured test showed Python (via uv) meeting the 300 ms startup on locked-down Windows laptops, which would move B above Q and possibly above Y. It also changes if Native AOT self-update were proven simple, which would put C# level with Go, or if Node SEA were promoted to stable, which would lift G above B.",
+        "unacceptable": [
+          "D",
+          "G"
+        ],
+        "hybrid": "Go for the CLI binary (P), with a thin Python or shell bootstrap installer only if the no-admin one-command install needs it."
+      }
+    ],
+    "discarded": [],
+    "warnings": []
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Generate"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Research"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "Challenge"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 4,
+      "title": "Referee"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 5,
+      "title": "Reply"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 6,
+      "title": "Rule"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 7,
+      "title": "Vote"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "advocate:B",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "ad1e44760891b0c34",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498748,
+      "queuedAt": 1794510498640,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option B. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510513829,
+      "tokens": 42834,
+      "toolCalls": 1,
+      "durationMs": 15079,
+      "resultPreview": "{\"claims\":[{\"text\":\"Python is the team's largest shared skill: 2 of 6 write it daily, and a Go, C# or TypeScript developer can read it quickly. Weekly releases and a new command in under a week favor the language with the lowest ramp-up.\",\"evidence\":\"reasoned\",\"confidence\":70},{\"text\":\"Python's hiring and turnover pool is very large. Over 5 years of staff turnover, replacements who can maintain a …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "advocate:Q",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "ace769164613afe33",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498801,
+      "queuedAt": 1794510498641,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Q. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510515253,
+      "tokens": 42837,
+      "toolCalls": 1,
+      "durationMs": 14596,
+      "resultPreview": "{\"claims\":[{\"text\":\"Rust compiles to a single native binary with no runtime. Python, Node and .NET targets must install or bundle an interpreter or runtime, which is hard to do without admin rights. This directly supports the one-command, no-admin install constraint.\",\"confidence\":80,\"evidence\":\"reasoned\"},{\"text\":\"Native Rust startup is typically a few milliseconds, far inside the 300 ms limit. P…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "advocate:P",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "a2d1ffa2d998a5a71",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498801,
+      "queuedAt": 1794510498641,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option P. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510515204,
+      "tokens": 42834,
+      "toolCalls": 1,
+      "durationMs": 14545,
+      "resultPreview": "{\"claims\":[{\"text\":\"Go compiles to one static binary per OS/arch with no runtime to install. Users need no Python, Node or .NET, so no admin rights and no version conflicts. This fits the one-command, no-admin install constraint.\",\"evidence\":\"reasoned\",\"confidence\":85},{\"text\":\"Native binaries start in single-digit to tens of milliseconds. That is far under the 300 ms budget on all three OSes. Pyt…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "advocate:Y",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "a1ecba57d9dc79c51",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498802,
+      "queuedAt": 1794510498642,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Y. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510515814,
+      "tokens": 42839,
+      "toolCalls": 1,
+      "durationMs": 15152,
+      "resultPreview": "{\"claims\":[{\"text\":\"C# with Native AOT or ReadyToRun single-file publish yields a self-contained binary for win/osx/linux, needing no runtime or admin rights on user machines, which fits the no-admin install constraint.\",\"confidence\":80,\"evidence\":\"reasoned\"},{\"text\":\"Native AOT .NET CLIs typically start in tens of milliseconds, well under the 300 ms budget, unlike Python or Node tools whose cold …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "advocate:G",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "a128fd5ff9fb935bd",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498803,
+      "queuedAt": 1794510498642,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option G. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510542804,
+      "tokens": 48649,
+      "toolCalls": 6,
+      "durationMs": 42141,
+      "resultPreview": "{\"claims\":[{\"text\":\"Node.js can build single executables for Windows, macOS and Linux from one JSON config, and can target another OS from a build host. That gives one-file, no-runtime installs without admin rights.\",\"evidence\":\"cited\",\"source\":\"https://nodejs.org/api/single-executable-applications.html\",\"confidence\":78},{\"text\":\"Node runs TypeScript natively by type stripping, and this is marked …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "advocate:D",
+      "phaseIndex": 2,
+      "phaseTitle": "Research",
+      "agentId": "a867e0235f9e360e3",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510498803,
+      "queuedAt": 1794510498642,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option D. Build the strongest honest case for it.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs with OAuth tok…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510515445,
+      "tokens": 42882,
+      "toolCalls": 1,
+      "durationMs": 14780,
+      "resultPreview": "{\"claims\":[{\"text\":\"Distribution is nearly free. Bash ships on macOS and Linux, and PowerShell ships on Windows 11. Plain scripts need no compiler, runtime install, or admin rights, so a one-command install can be a git clone or a file copy.\",\"confidence\":70,\"evidence\":\"reasoned\"},{\"text\":\"Startup cost is small for simple commands. No VM or runtime has to load, so common commands plausibly beat th…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "challenge:B",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a1cd11c61e5387dae",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544889,
+      "queuedAt": 1794510544794,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option B. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510574684,
+      "tokens": 48817,
+      "toolCalls": 1,
+      "durationMs": 29794,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"Q-C3\",\"text\":\"rustls does not read the OS certificate store by default, so internal REST APIs behind a corporate CA can fail TLS on some laptops. 'Identical behavior' needs an extra crate and per-OS testing.\",\"evidence\":\"The rustls README says it uses webpki-roots or rustls-native-certs for trust anchors, and rustls-native-certs is a separate crate. This is prior kno…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "challenge:Q",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a746fc3daa4e54d86",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544917,
+      "queuedAt": 1794510544796,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Q. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510582588,
+      "tokens": 48815,
+      "toolCalls": 1,
+      "durationMs": 36100,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"B-C5\",\"text\":\"The one-command, no-admin install does not hold, because 'uv tool install' and 'pipx install' need uv or pipx on the laptop first. That makes at least two steps on a fresh machine. The claim also needs an internal package index, which the problem statement does not provide.\",\"evidence\":\"Rival B-W1 states: 'Engineers need a working Python or uv bootstrap…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "challenge:P",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a4062d8028ca75718",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544918,
+      "queuedAt": 1794510544799,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option P. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510583433,
+      "tokens": 48812,
+      "toolCalls": 1,
+      "durationMs": 36943,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"B-C4\",\"text\":\"The claim that a pure-Python wheel installs identically everywhere does not hold for the OAuth libraries it names. msal and authlib pull in the cryptography package, which is a compiled extension distributed as platform-specific wheels. The install is therefore not one pure wheel, and it carries per-OS build and wheel-availability risk.\",\"evidence\":\"msa…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 10,
+      "label": "challenge:Y",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a786fed3c5b80a8ce",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544918,
+      "queuedAt": 1794510544801,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Y. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510579232,
+      "tokens": 48812,
+      "toolCalls": 1,
+      "durationMs": 32741,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"B-C5\",\"text\":\"The claim says install and update are one command without admin rights, but 'uv tool install' and 'pipx install' both need uv or pipx on the machine first. That is a second step, and B-W1 says it can fail on locked-down Windows laptops. The constraint is one command on all 3 OSes, so the claim does not meet it.\",\"evidence\":\"uv docs, https://docs.astral.…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 11,
+      "label": "challenge:G",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a07e4b6d3e6d0d28e",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544919,
+      "queuedAt": 1794510544804,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option G. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510576023,
+      "tokens": 48811,
+      "toolCalls": 1,
+      "durationMs": 29530,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"B-C4\",\"text\":\"Pure-Python wheels do not cover the OAuth libraries named in the claim, so cross-OS behavior is not as uniform as stated.\",\"evidence\":\"authlib and msal both depend on the 'cryptography' package for JWT/signing. 'cryptography' is published as platform-specific binary wheels (PyPI: https://pypi.org/project/cryptography/) and builds from Rust source where …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 12,
+      "label": "challenge:D",
+      "phaseIndex": 3,
+      "phaseTitle": "Challenge",
+      "agentId": "a9c9a4f55ea864021",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510544919,
+      "queuedAt": 1794510544806,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option D. This is debate round 1: challenge your rivals' claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call internal REST APIs…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510573051,
+      "tokens": 48812,
+      "toolCalls": 1,
+      "durationMs": 26554,
+      "resultPreview": "{\"challenges\":[{\"targetClaim\":\"B-C4\",\"text\":\"The claim says a pure-Python wheel installs identically on all three OSes. The OAuth libraries it names are not pure Python. authlib requires the cryptography package, and msal also requires cryptography. cryptography is a compiled extension (Rust and C) shipped as per-platform wheels, so the install pulls native code per OS and architecture. A platform…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 13,
+      "label": "referee:filter",
+      "phaseIndex": 4,
+      "phaseTitle": "Referee",
+      "agentId": "ade8e1574ad9024e6",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510585605,
+      "queuedAt": 1794510585539,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are a neutral referee. Rewrite each debate challenge below into neutral form.\nKeep the exact factual content. Delete confidence and tone words such as \"clearly\", \"obviously\", and \"any expert knows\", and any appeal to authority.\nRemove any reference to which option wrote the challenge, such as \"our option\" or the challenger's own claim IDs.\nReturn every challenge by its ID. Do not add, drop, or…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510675935,
+      "tokens": 54597,
+      "toolCalls": 1,
+      "durationMs": 90328,
+      "resultPreview": "{\"challenges\":[{\"id\":\"CH1\",\"text\":\"(against Q-C3) rustls does not read the OS certificate store by default, so internal REST APIs behind a corporate CA can fail TLS on some laptops. 'Identical behavior' needs an extra crate and per-OS testing. | Evidence: The rustls README says it uses webpki-roots or rustls-native-certs for trust anchors, and rustls-native-certs is a separate crate. This is prior…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 14,
+      "label": "reply:B",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "a3352bac3afc8af45",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678114,
+      "queuedAt": 1794510678059,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option B. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510698170,
+      "tokens": 47433,
+      "toolCalls": 1,
+      "durationMs": 20055,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH11\",\"kind\":\"partial\",\"evidence\":\"The bootstrap point stands: uv or pipx must exist before 'uv tool install'. uv installs per-user with no admin rights via its standalone installer, and the problem says 'one command' without saying how many commands a first-time setup may take. Updates after setup are one command. The internal-index point stands too, because the statem…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 15,
+      "label": "reply:Q",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "a5209d29d6ea808f6",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678133,
+      "queuedAt": 1794510678060,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Q. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510702726,
+      "tokens": 46255,
+      "toolCalls": 1,
+      "durationMs": 23579,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH1\",\"kind\":\"partial\",\"evidence\":\"The challenge is right that rustls does not use the OS trust store by default; trust anchors come from webpki-roots or from rustls-native-certs / rustls-platform-verifier, which are separate crates or features. What stands: this is a one-time dependency choice (reqwest's rustls-tls-native-roots feature, or rustls-platform-verifier, whic…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 16,
+      "label": "reply:P",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "a52f7d45a418de3bf",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678134,
+      "queuedAt": 1794510678061,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option P. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510695296,
+      "tokens": 46316,
+      "toolCalls": 1,
+      "durationMs": 16147,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH3\",\"kind\":\"partial\",\"evidence\":\"P-W1 already concedes the early slowdown. What stands: Go has 25 keywords and a small standard idiom set, so a one-week command (flag parsing, an HTTP call, JSON output) is plausible after a short ramp. But 'in weeks' has no source or test, and the first weeks overlap the one-week target.\",\"newConfidence\":60,\"dropReason\":\"The claim's ow…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 17,
+      "label": "reply:Y",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "afa53654c10911f50",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678134,
+      "queuedAt": 1794510678061,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option Y. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510697585,
+      "tokens": 47154,
+      "toolCalls": 1,
+      "durationMs": 18435,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH5\",\"kind\":\"partial\",\"evidence\":\"The TypeScript half stands: C# and TypeScript share a lead designer and similar syntax (async/await, generics, lambdas, interfaces, nullable types). The Go and Python halves are not supported. C# has no stated advantage for Python developers, and Y-W1 already concedes that Go has similar skills.\",\"reason\":\"Concede that the claim overrea…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 18,
+      "label": "reply:G",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "ade4aa53bc8b5e08f",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678134,
+      "queuedAt": 1794510678062,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option G. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510721619,
+      "tokens": 50461,
+      "toolCalls": 2,
+      "durationMs": 42468,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH7\",\"kind\":\"partial\",\"evidence\":\"The cited Node typescript page lists these limits: no stripping under node_modules, enums and namespaces need --experimental-transform-types, imports need explicit .ts extensions. G-C8 already says the shipped artifact is an esbuild bundle, so a build step exists for release. What stands: the dev loop (run, test, debug a .ts file) needs…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 19,
+      "label": "reply:D",
+      "phaseIndex": 5,
+      "phaseTitle": "Reply",
+      "agentId": "ab82966518a1f2d8c",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510678135,
+      "queuedAt": 1794510678062,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the advocate for Option D. This is debate round 2: reply to every challenge against your claims.\nProblem statement (frozen):\nSynthetic test. A 6-person platform team must choose the programming language for a new internal command-line tool before starting work.\n\nAbout 300 engineers use the tool on macOS, Windows 11, and Linux laptops to scaffold new services, run local checks, and call int…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510698648,
+      "tokens": 47472,
+      "toolCalls": 1,
+      "durationMs": 19496,
+      "resultPreview": "{\"replies\":[{\"challengeId\":\"CH9\",\"kind\":\"partial\",\"evidence\":\"Bash 3.2 on macOS is real, but it is a known fixed target. Scripts can be written to POSIX/Bash 3.2 and tested against it, so the macOS and Linux variants need not differ. The two-codebase point (Bash plus PowerShell) is my own D-W1 and stands.\",\"reason\":\"Bash 3.2 is a constraint, not a break for macOS/Linux. The Windows split remains.\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 20,
+      "label": "ruling:R1",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a35d46df96f6b9760",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723384,
+      "queuedAt": 1794510723347,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I fetched docs.rs/reqwest/latest. The current version is 0.…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Rust's std and crates like clap, reqwest and oauth2 abstract away OS differences in paths, line endings and TLS. Pure-Rust TLS (rustls) avoids reliance on a system OpenSSL, which supports identical behavior on macOS, Windows and Linux.\n\nChallenges against the claim (…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510747168,
+      "tokens": 46920,
+      "toolCalls": 3,
+      "durationMs": 23784,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I fetched docs.rs/reqwest/latest. The current version is 0.13.5. Its TLS features are default-tls (on by default), rustls, rustls-no-provider, native-tls and the native-tls-vendored and no-alpn variants. The rustls-tls-webpki-roots and rustls-tls-native-roots features that Challenges 2 and 3 quote are not listed in 0.13, so those challenges rest on 0.12-era docs. The…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 21,
+      "label": "ruling:R2",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "aa691bf0393eca693",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723399,
+      "queuedAt": 1794510723348,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I read all four challenges and their defenses. Every defens…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Rust is widely used for developer CLIs (ripgrep, uv, ruff, GitHub-adjacent tooling), so patterns for self-update, shell completions and packaging are mature. Hiring and onboarding for Rust is also viable because many engineers want to learn it.\n\nChallenges against th…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510733183,
+      "tokens": 44148,
+      "toolCalls": 1,
+      "durationMs": 8499,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I read all four challenges and their defenses. Every defense concedes the hiring and onboarding half of Q-C7, so I checked whether the claim gives any support for that half. It gives only \\\"many engineers want to learn it\\\": no source, confidence 50. This goes against Q-W1 and the problem statement, which say nobody on the team has shipped production Rust. I did not …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 22,
+      "label": "ruling:R3",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a21a3a49f1c2ea98a",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723399,
+      "queuedAt": 1794510723348,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "There was no test to re-run or source to read, because the …",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Go is small and conventional, and Go 1 compatibility promises are strong. Python, TypeScript and C# developers can learn it in weeks, and new hires read it easily. This helps five-year turnover and the under-one-week command target.\n\nChallenges against the claim (3),…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510733842,
+      "tokens": 43476,
+      "toolCalls": 1,
+      "durationMs": 9157,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"There was no test to re-run or source to read, because the claim is marked reasoned-only and P-W2 says no tool calls were made. I compared the claim's wording with P-W1 as all three challenges quote it, and with the three defenses. I also checked the background facts the defense gives against what I know: Go 1 really does have a formal compatibility promise, and the …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 23,
+      "label": "ruling:R4",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "af136327ccaf37ffb",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723399,
+      "queuedAt": 1794510723348,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I compared the claim with both challenges and with the defe…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Single binaries are easy to call from other scripts: stable exit codes, no interpreter or environment dependency. Support tickets from broken virtualenvs, node versions or missing runtimes largely disappear, helping the under-1-per-100-users goal.\n\nChallenges against…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510733794,
+      "tokens": 43134,
+      "toolCalls": 1,
+      "durationMs": 9108,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I compared the claim with both challenges and with the defender's partial concessions. The challenges quote P-W2 from the case: a running .exe cannot be replaced in place on Windows, and macOS signing and notarisation plus Windows SmartScreen and antivirus flags are unverified. Nobody ran a test or measured ticket rates, and this workspace holds nothing I could re-ru…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 24,
+      "label": "ruling:R5",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "aa4a713f7992aab45",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723399,
+      "queuedAt": 1794510723349,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I read both challenges and both defenses against the claim …",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: C# is statically typed with strong IDE tooling, and its syntax is familiar to the 2 TypeScript developers (same language designer lineage) and the Go developer, so ramp-up for the 4 non-C# developers is short.\n\nChallenges against the claim (2), each with the defense:…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510732170,
+      "tokens": 43296,
+      "toolCalls": 1,
+      "durationMs": 7483,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I read both challenges and both defenses against the claim text, and compared them with the cited case evidence (Y-W1: 'Only 1 of 6 developers knows C#'). Both defenses concede the main points. Challenge 1 shows that the claim gives no support for Go or Python developers. Challenge 2 shows that the short ramp-up is not measured, and that the hard parts of the stack (…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 25,
+      "label": "ruling:R6",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a870f3325f001e47e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510723400,
+      "queuedAt": 1794510723349,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I fetched https://nodejs.org/api/typescript.html. It confir…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [cited]: Node runs TypeScript natively by type stripping, and this is marked Stable (v25.2 / v24.12). TS developers need no build step, and Python, Go and C# developers still get type checking from tsc in CI. (source: https://nodejs.org/api/typescript.html)\n\nChallenges against t…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510748986,
+      "tokens": 47450,
+      "toolCalls": 3,
+      "durationMs": 24298,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I fetched https://nodejs.org/api/typescript.html. It confirms that type stripping is \\\"Stability: 2 - Stable\\\" from v25.2.0 and v24.12.0. It also lists these limits. Node refuses TypeScript files under node_modules. enum, namespaces with runtime code, parameter properties and import aliases fail with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX. Decorators cause a parse error. …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 26,
+      "label": "ruling:R7",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a33ece9e2f3c291e9",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510733893,
+      "queuedAt": 1794510723349,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I ran PowerShell on this Windows 11 Enterprise laptop. $PSV…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Distribution is nearly free. Bash ships on macOS and Linux, and PowerShell ships on Windows 11. Plain scripts need no compiler, runtime install, or admin rights, so a one-command install can be a git clone or a file copy.\n\nChallenges against the claim (5), each with …",
+      "promptFramed": true,
+      "lastProgressAt": 1794510756503,
+      "tokens": 46960,
+      "toolCalls": 2,
+      "durationMs": 22610,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I ran PowerShell on this Windows 11 Enterprise laptop. $PSVersionTable reports 5.1.26100, so the shell that ships is Windows PowerShell 5.1, not PowerShell 7. Get-ExecutionPolicy -List shows LocalMachine set to AllSigned (not the out-of-box Restricted), CurrentUser set to RemoteSigned (which wins over LocalMachine), Process set to Bypass, and both Group Policy scopes…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 27,
+      "label": "ruling:R8",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a2ef13f11944f5fd4",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510734964,
+      "queuedAt": 1794510723350,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I compared the claim with the problem statement and D-W2 as…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Scaffolding, running local checks, and chaining other tools are shell's home turf. Most of the tool's described work is calling existing CLIs, so shell glue fits better than reimplementing them in a general-purpose language.\n\nChallenges against the claim (4), each wi…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510742372,
+      "tokens": 44250,
+      "toolCalls": 1,
+      "durationMs": 7408,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I compared the claim with the problem statement and D-W2 as quoted in all four challenges. The problem statement lists three core jobs: scaffold new services, run local checks, and call internal REST APIs with OAuth tokens. D-W2 says OAuth handling, JSON parsing and REST calls are fragile in shell and depend on curl and jq, which are not on every OS. D-W1 says Bash a…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 28,
+      "label": "ruling:R9",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a0f99b86f4bebbe2c",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510735395,
+      "queuedAt": 1794510723350,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I read all five challenges and their defenses against what …",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Install and update can be one command without admin rights using per-user tools such as 'uv tool install' or 'pipx install' from an internal package index. Updates are 'uv tool upgrade'. No paid licenses are involved.\n\nChallenges against the claim (5), each with the …",
+      "promptFramed": true,
+      "lastProgressAt": 1794510743895,
+      "tokens": 45013,
+      "toolCalls": 1,
+      "durationMs": 8499,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I read all five challenges and their defenses against what I know of the uv and pipx install docs. 'uv tool install' and 'uv tool upgrade' need uv on the machine first, and uv is installed by a separate standalone script, such as 'powershell -ExecutionPolicy ByPass -c \\\"irm https://astral.sh/uv/install.ps1 | iex\\\"'. pipx needs Python 3.9 or later, and a clean Windows…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 29,
+      "label": "ruling:R10",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "aa640192b14e6947c",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510735675,
+      "queuedAt": 1794510723350,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I timed CPython 3.13.1 (C:\\Python313\\python.exe) cold start…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Interpreter startup is roughly tens of milliseconds, so 300 ms is reachable if imports are lazy and heavy libraries are avoided on common commands. This is a design discipline, and I did not measure it.\n\nChallenges against the claim (2), each with the defense:\nChalle…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510788664,
+      "tokens": 45962,
+      "toolCalls": 3,
+      "durationMs": 52988,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I timed CPython 3.13.1 (C:\\\\Python313\\\\python.exe) cold starts on this Windows 11 Enterprise machine, using subprocess with perf_counter. A bare `python -c pass` took 135-434 ms over 8 runs, with a median of about 200 ms. With `-S` it took 330-520 ms. Importing only json, argparse and pathlib from the standard library took 297-557 ms. httpx, jinja2 and authlib are no…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 30,
+      "label": "ruling:R11",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "acb0e0bbb1786edc9",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510744280,
+      "queuedAt": 1794510723351,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I compared the claim's wording, \"behavior is identical acro…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: One compiled binary has no interpreter or dependency drift, so behavior is identical across macOS, Windows 11 and Linux, and scripts calling it dozens of times daily never hit environment breakage that drives tickets.\n\nChallenges against the claim (1), each with the …",
+      "promptFramed": true,
+      "lastProgressAt": 1794510752302,
+      "tokens": 42858,
+      "toolCalls": 1,
+      "durationMs": 8022,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I compared the claim's wording, \\\"behavior is identical across macOS, Windows 11 and Linux\\\" and \\\"never hit environment breakage\\\", with Challenge 1 and the partial defense. I checked the facts against what I know of the .NET documentation; I ran no tests and fetched no pages. Two facts stand. First, .NET file I/O follows the host file system, which is case-insensit…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 31,
+      "label": "ruling:R12",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "ab4e4d9b86be8d1c2",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510745951,
+      "queuedAt": 1794510723351,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I downloaded the current msal (1.39.0) and authlib (1.9.5) …",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Mature OAuth and HTTP libraries exist (authlib, msal, requests/httpx) and a pure-Python wheel installs identically on macOS, Windows and Linux. That reduces the cross-OS behavior risk versus native builds per platform.\n\nChallenges against the claim (3), each with the…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510788654,
+      "tokens": 46457,
+      "toolCalls": 2,
+      "durationMs": 42702,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I downloaded the current msal (1.39.0) and authlib (1.9.5) wheels from PyPI and read their METADATA. Both are py3-none-any wheels, but both list cryptography under Requires-Dist: authlib needs cryptography>=45.0.1 and msal needs cryptography<51,>=2.5 plus PyJWT[crypto]. msal's optional broker extra also pulls pymsalruntime, which is a native package chosen per OS. cr…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 32,
+      "label": "ruling:R13",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "aa69d2c75b69ea7e2",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510749715,
+      "queuedAt": 1794510723351,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I compared the claim's wording with what the Microsoft .NET…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: C# with Native AOT or ReadyToRun single-file publish yields a self-contained binary for win/osx/linux, needing no runtime or admin rights on user machines, which fits the no-admin install constraint.\n\nChallenges against the claim (1), each with the defense:\nChallenge…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510759542,
+      "tokens": 43016,
+      "toolCalls": 1,
+      "durationMs": 9826,
+      "resultPreview": "{\"claimHolds\":true,\"checked\":\"I compared the claim's wording with what the Microsoft .NET deployment docs say about ReadyToRun, self-contained single-file publish and Native AOT. I did not fetch or run anything. ReadyToRun does keep IL code and still needs the runtime and the JIT. When you publish it as a self-contained single file, the runtime is bundled inside the executable, so the user does no…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 33,
+      "label": "ruling:R14",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "ad60c761df45921ca",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510750764,
+      "queuedAt": 1794510723351,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I fetched https://nodejs.org/api/single-executable-applicat…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [cited]: Node.js can build single executables for Windows, macOS and Linux from one JSON config, and can target another OS from a build host. That gives one-file, no-runtime installs without admin rights. (source: https://nodejs.org/api/single-executable-applications.html)\n\nChal…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510786636,
+      "tokens": 46727,
+      "toolCalls": 3,
+      "durationMs": 35871,
+      "resultPreview": "{\"claimHolds\":true,\"checked\":\"I fetched https://nodejs.org/api/single-executable-applications.html. It marks the feature 'Stability: 1.1 - Active development'. `node --build-sea sea-config.json` builds an executable from one JSON config. Cross-platform output is documented, for example building linux-x64 on darwin-arm64. That requires the same Node version on the build host and target, and useCode…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 34,
+      "label": "ruling:R15",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "aef8af049ed4ff8e9",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510753977,
+      "queuedAt": 1794510723351,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I tried to cross-compile a net/http test program with CGO_E…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Cross-compiling for macOS, Windows and Linux from one CI job is built into the Go toolchain (GOOS/GOARCH). A weekly release needs no per-OS build machines, and the same code is the same binary logic everywhere.\n\nChallenges against the claim (1), each with the defense…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510788987,
+      "tokens": 45610,
+      "toolCalls": 2,
+      "durationMs": 35010,
+      "resultPreview": "{\"claimHolds\":true,\"checked\":\"I tried to cross-compile a net/http test program with CGO_ENABLED=0 for darwin/arm64, darwin/amd64, linux/amd64 and windows/amd64. I could not run it because Go is not installed on this machine. I then weighed the challenge against what I know of the tooling: (1) GOOS/GOARCH cross-compilation is built into the Go toolchain and needs no cgo for net/http or x/oauth2. (2…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 35,
+      "label": "ruling:R16",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "ac24eb2532b1ad6d7",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510758443,
+      "queuedAt": 1794510723352,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I read the claim, Challenge 1 and Defense 1 side by side. G…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: No paid licenses are needed. Node and npm are open source. Rust has no production experience on the team, so JS/TS has far less learning risk than Rust, and its iteration speed is better than Go's or C#'s for this team.\n\nChallenges against the claim (1), each with th…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510764694,
+      "tokens": 42739,
+      "toolCalls": 1,
+      "durationMs": 6233,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I read the claim, Challenge 1 and Defense 1 side by side. G-C7 is tagged [reasoned] and cites no source. G-W1 says no measurements were run. The defense concedes the iteration-speed comparison. I did not re-check the no-license point (Node is MIT-licensed and npm is Artistic-2.0, both open source); the challenge does not dispute it. I did not re-check the lower learn…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 36,
+      "label": "ruling:R17",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "af8208b898c5062c5",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510761287,
+      "queuedAt": 1794510723352,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I did not fetch any page or run any build. I compared the c…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Rust compiles to a single native binary with no runtime. Python, Node and .NET targets must install or bundle an interpreter or runtime, which is hard to do without admin rights. This directly supports the one-command, no-admin install constraint.\n\nChallenges against…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510779370,
+      "tokens": 42795,
+      "toolCalls": 1,
+      "durationMs": 18083,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I did not fetch any page or run any build. I compared the challenge's quote with my own knowledge of Microsoft's .NET deployment docs. Those docs say Native AOT produces a self-contained native executable that does not need the .NET runtime installed. They also say self-contained publish bundles the runtime into the app folder and needs no admin rights. The defense c…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 37,
+      "label": "ruling:R18",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a28e6ef30c32074e6",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510766297,
+      "queuedAt": 1794510723352,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I checked the claim against the challenge and the defense's…",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Go compiles to one static binary per OS/arch with no runtime to install. Users need no Python, Node or .NET, so no admin rights and no version conflicts. This fits the one-command, no-admin install constraint.\n\nChallenges against the claim (1), each with the defense:…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510792624,
+      "tokens": 46784,
+      "toolCalls": 2,
+      "durationMs": 26326,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I checked the claim against the challenge and the defense's own concession. I also looked for a Go toolchain on this machine so I could build a test binary, but none is installed, so I could not run any test. The council-mode repo has no Go code or install script to read. On general knowledge: Go does produce a single binary per OS/arch with no separate runtime. A fu…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 38,
+      "label": "ruling:R19",
+      "phaseIndex": 6,
+      "phaseTitle": "Rule",
+      "agentId": "a79d9ddc721989700",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510783665,
+      "queuedAt": 1794510723352,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I compared the claim's wording with the evidence cited for …",
+      "promptPreview": "You are a neutral referee. Rule whether one disputed claim holds. You do not know which option the claim supports.\nClaim [reasoned]: Per-OS CI builds with a matrix are straightforward. A weekly release can publish the binaries to a package feed or internal URL, and a built-in self-update command gives the one-command no-admin update.\n\nChallenges against the claim (1), each with the defense:\nChalle…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510797206,
+      "tokens": 42757,
+      "toolCalls": 1,
+      "durationMs": 13540,
+      "resultPreview": "{\"claimHolds\":false,\"checked\":\"I compared the claim's wording with the evidence cited for the challenge and the defense, and checked it against what I know of .NET. .NET has no general self-update for a published or self-contained executable. 'dotnet tool update' only updates tools installed through the .NET SDK, so the laptop needs the SDK. Y-W2 says the team must build the installer and self-upd…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 39,
+      "label": "vote:Everyday engineer user",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "a6efd16f2d4c3b203",
+      "model": "claude-haiku-5-5",
+      "state": "done",
+      "startedAt": 1794510799045,
+      "queuedAt": 1794510798878,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "My ranking changes if a measured cold start under 300 ms on…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Everyday engineer user.\nYour criteria sheet:\nCares about (in order): fast start, easy install and update, clear help and errors\nAccepts: a larger download\nRejects: a runtime they must manage themselves\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n## Problem\nSynthetic test. A 6-person platform t…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510827189,
+      "tokens": 56963,
+      "toolCalls": 1,
+      "durationMs": 28143,
+      "resultPreview": "{\"ranking\":[\"P\",\"Q\",\"Y\",\"G\",\"D\",\"B\"],\"reasons\":[{\"higher\":\"P\",\"lower\":\"Q\",\"reason\":\"Both give a native single binary with no runtime to manage and a fast start, so this is a close call. Go edges ahead on the criteria because its cross-OS release path is cheap and the no-admin single-binary point survives (R18), while Rust's install and signing work is flagged as unresolved (Q-W2) and its install c…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 40,
+      "label": "vote:Platform team maintainer",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "ae253fb71791920c5",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510799075,
+      "queuedAt": 1794510798885,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "my ranking changes if a measured Node SEA or bundled build …",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Platform team maintainer.\nYour criteria sheet:\nCares about (in order): speed of adding commands, debugging and test tooling, few dependencies\nAccepts: some build complexity\nRejects: a codebase only 1 team member can change\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n## Problem\nSynthetic test. …",
+      "promptFramed": true,
+      "lastProgressAt": 1794510813282,
+      "tokens": 56976,
+      "toolCalls": 1,
+      "durationMs": 14205,
+      "resultPreview": "{\"ranking\":[\"G\",\"P\",\"Y\",\"B\",\"Q\",\"D\"],\"reasons\":[{\"higher\":\"G\",\"lower\":\"P\",\"reason\":\"G has two TypeScript developers plus mature npm CLI and OAuth libraries, so new commands ship fastest and the codebase is not a one-person silo. P has only one Go developer and five must retrain. G's SEA packaging risk and startup uncertainty are real but accepted as build complexity.\",\"cites\":[\"G-C6\",\"G-C5\",\"G-C8\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 41,
+      "label": "vote:Future new hire",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "afb049696164095dc",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510799103,
+      "queuedAt": 1794510798896,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "my ranking changes if Python startup on a managed Windows l…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Future new hire.\nYour criteria sheet:\nCares about (in order): readable code, size of the hiring pool, quality of docs and examples\nAccepts: a less fashionable stack\nRejects: code that needs specialist knowledge to change\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n## Problem\nSynthetic test. A …",
+      "promptFramed": true,
+      "lastProgressAt": 1794510814641,
+      "tokens": 56979,
+      "toolCalls": 1,
+      "durationMs": 11142,
+      "resultPreview": "{\"ranking\":[\"G\",\"P\",\"B\",\"Y\",\"D\",\"Q\"],\"reasons\":[{\"higher\":\"G\",\"lower\":\"P\",\"reason\":\"JS/TS has the largest hiring pool and excellent docs, and readable code. Its docs are cited, and the surviving claims on libraries and hiring remain. Go has the smaller pool and 5 of 6 developers must retrain.\",\"cites\":[\"G-C5\",\"G-C6\",\"G-C1\",\"P-W1\",\"R3\"]},{\"higher\":\"P\",\"lower\":\"B\",\"reason\":\"Go is small, conventional…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 42,
+      "label": "vote:Release engineer",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "a6dac783e7ae46bf7",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510799104,
+      "queuedAt": 1794510798908,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "My ranking changes if a ruling showed that Go cannot sign a…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Release engineer.\nYour criteria sheet:\nCares about (in order): reproducible builds for 3 OSes from one CI, code signing on macOS and Windows, small artifacts\nAccepts: longer CI builds\nRejects: per-OS build machines kept by hand\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n## Problem\nSynthetic t…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510818828,
+      "tokens": 56983,
+      "toolCalls": 1,
+      "durationMs": 19723,
+      "resultPreview": "{\"ranking\":[\"P\",\"Q\",\"Y\",\"G\",\"B\",\"D\"],\"reasons\":[{\"higher\":\"P\",\"lower\":\"Q\",\"reason\":\"Go best fits my top criterion. R15 rules that P-C3 holds: one CI job cross-compiles for all 3 OSes with GOOS/GOARCH, and macOS signing and notarisation run from Linux (quill, rcodesign), so no per-OS build machine is needed. Rust can also release from one pipeline (Q-C4), but it usually uses a runner matrix, and Q-…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 43,
+      "label": "vote:Security engineer",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "a3db63d74d60d4721",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794510799130,
+      "queuedAt": 1794510798924,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "My ranking changes if the team shows that Rust's crate tree…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Security engineer.\nYour criteria sheet:\nCares about (in order): supply-chain risk of dependencies, memory safety, fast toolchain patches\nAccepts: fewer features\nRejects: unpinned or unaudited dependency trees\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n## Problem\nSynthetic test. A 6-person pla…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510824250,
+      "tokens": 56971,
+      "toolCalls": 1,
+      "durationMs": 20724,
+      "resultPreview": "{\"ranking\":[\"P\",\"Y\",\"Q\",\"B\",\"D\",\"G\"],\"reasons\":[{\"higher\":\"P\",\"lower\":\"Y\",\"reason\":\"Go's standard library covers HTTP, TLS, JSON, and process execution. Only a few dependencies remain (cobra, x/oauth2), and the module proxy plus checksums keeps the tree small and pinned. One Linux CI job cross-compiles for all OSes, which makes urgent toolchain patches fast. C# also has a small dependency tree, bu…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 44,
+      "label": "vote:Developer-experience support lead",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "ac309afac0739819b",
+      "model": "claude-haiku-5-5",
+      "state": "done",
+      "startedAt": 1794510799131,
+      "queuedAt": 1794510798930,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "My ranking changes if a measured test shows Go's install or…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Developer-experience support lead.\nYour criteria sheet:\nCares about (in order): the same behavior on all 3 OSes, actionable error messages, easy diagnostics from users\nAccepts: a slower feature pace\nRejects: OS-specific bugs that need per-machine fixes\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510827704,
+      "tokens": 56987,
+      "toolCalls": 1,
+      "durationMs": 26617,
+      "resultPreview": "{\"ranking\":[\"P\",\"G\",\"Y\",\"Q\",\"B\",\"D\"],\"reasons\":[{\"higher\":\"P\",\"lower\":\"G\",\"reason\":\"Go gives one source tree built into one binary per OS from one CI job with no runtime on the user's machine, so the same code path runs everywhere. The ruling says cross-compiling and signing can be done from Linux, which keeps per-OS work in CI and off the laptops. Node's single-executable path is still Stability …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 45,
+      "label": "vote:Engineering manager (5-year owner)",
+      "phaseIndex": 7,
+      "phaseTitle": "Vote",
+      "agentId": "a6637bac2dad0fb6e",
+      "model": "claude-sonnet-5-5",
+      "state": "done",
+      "startedAt": 1794510815193,
+      "queuedAt": 1794510798936,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "my ranking changes if a measured test showed Python (via uv…",
+      "promptPreview": "You are a voter on a decision panel. Your persona: Engineering manager (5-year owner).\nYour criteria sheet:\nCares about (in order): total cost of ownership, staffing risk under turnover, long-term toolchain support\nAccepts: a higher first build cost\nRejects: a toolchain with uncertain 5-year support\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\n…",
+      "promptFramed": true,
+      "lastProgressAt": 1794510830688,
+      "tokens": 56987,
+      "toolCalls": 1,
+      "durationMs": 15493,
+      "resultPreview": "{\"ranking\":[\"P\",\"Y\",\"Q\",\"B\",\"G\",\"D\"],\"reasons\":[{\"higher\":\"P\",\"lower\":\"Y\",\"reason\":\"Go gives the same compiled-binary benefits with one-job cross-compilation (R15 holds), while C# Native AOT needs a per-OS build matrix and a self-updater the team must build (R19, X1, X9). Go 1 compatibility is a strong 5-year support signal and the stdlib keeps dependencies low (P-C4). Both start with one experien…"
+    }
+  ],
+  "totalTokens": 2144640,
+  "totalToolCalls": 63
+}

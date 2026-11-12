@@ -1,0 +1,9 @@
+{
+  "runId": "wf_f85173db-8a6",
+  "date": "2026-11-12",
+  "scriptCommit": "1a8ce56",
+  "rulings": "per-claim",
+  "fixedOptions": true,
+  "thresholds": { "sycophancy": 0.75, "stubbornAdverse": 2 },
+  "notes": "Synthetic 5-language follow-up for the persona test: Python, Rust, Go, C#, JavaScript as fixed options, shell scripts as the baseline, a mixed-skill 6-person platform team. Go won by Condorcet."
+}
