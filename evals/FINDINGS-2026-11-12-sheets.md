@@ -48,3 +48,19 @@ No difference passed its bar.
 - First choices vary between runs. The same production sheet gave Go 15, JS 3, C# 2, and Rust 1 in the persona run (`2026-11-12-persona-5lang`), and Go 18 with JS 3 here.
 
 **Decision (user, 2026-11-12).** Keep ranked "Cares about" items in the template. Ranking costs nothing, and it was the only change that erased a minority pick. Evidence log: E5.
+
+## S2: no Accepts or Rejects lines
+
+**Result.**
+- **Adherence:** 0.93 → 0.88.
+- **Top-item weight:** 0.52 → 0.66. This passed its bar.
+- **Rejects violations per ballot:** 0.52 → 0.62, far under the 0.5 bar.
+- **Top first-choice share:** 0.86 → 1.00.
+
+The judge tied 19 of 105 reasons to the Rejects line under S0, and 3 of 105 under S2.
+
+**What it shows.** The Accepts and Rejects lines give voters a second kind of argument: what they rule out. Without the lines, those reasons moved to the voter's #1 item. That move is the whole of the top-item weight gain, so the passed bar is mechanical and does not mean voters weighed their priorities better. Removing the lines erased the same minority pick that S1 erased: the platform team maintainer (Rejects: "a codebase only 1 team member can change") went from JavaScript 3 times out of 3 to Go 3 times out of 3. That pick needed both the ranking and the limits.
+
+**Open question.** The Rejects line did not prevent violations. Voters who saw it still ranked an option the judge read as breaking it above one that didn't, about once every 2 ballots. This run cannot tell whether voters override their own limit when other evidence is strong, or whether the judge flags too freely.
+
+**Decision (user, 2026-11-12).** Keep the Accepts and Rejects lines in the template. Evidence log: E6 and E7.
