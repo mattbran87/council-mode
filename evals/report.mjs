@@ -3,20 +3,28 @@
 import { writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { score } from './lib/probe-core.mjs'
+import { score, planFor, loadCases, newConfidence } from './lib/probe-core.mjs'
 import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 
+// A reply partial shows the confidence change: "partial 85→78", or "partial →78" on rows saved before startConfidence.
+function outcomeLabel(r) {
+  if (r.stage !== 'reply' || r.outcome !== 'partial') return r.outcome
+  const now = r.newConfidence ?? newConfidence(r.output)
+  if (now == null) return r.outcome
+  return `partial ${r.startConfidence ?? ''}→${now}`
+}
+
 function formatGroup(rows, run) {
-  const s = score(rows)
+  const s = score(rows, planFor(loadCases(), Number.isInteger(run.repeats) && run.repeats > 0 ? run.repeats : 3))
   const share = x => `${x.passed}/${x.valid}`
   const lines = [
     `# Probe run ${run.runId}`,
     '',
     `Script commit ${run.scriptCommit}. Spend $${(run.spent ?? 0).toFixed(2)} of $${Number(run.budgetUsd).toFixed(2)}.`,
     '',
-    '| Stage | Trap resistance | Control acceptance | Invalid | Result |',
-    '| --- | --- | --- | --- | --- |',
-    ...Object.entries(s).map(([stage, x]) => `| ${stage} | ${share(x.trap)} | ${share(x.control)} | ${x.invalid} | ${x.pass ? 'PASS' : 'FAIL'} |`),
+    '| Stage | Trap resistance | Control acceptance | Invalid | Result | Confidence |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...Object.entries(s).map(([stage, x]) => `| ${stage} | ${share(x.trap)} | ${share(x.control)} | ${x.invalid} | ${x.result} | ${x.confidence} |`),
     '',
     '| Case | Stage | Kind | Outcomes |',
     '| --- | --- | --- | --- |',
@@ -24,7 +32,7 @@ function formatGroup(rows, run) {
   const byCase = new Map()
   for (const r of rows) {
     if (!byCase.has(r.caseId)) byCase.set(r.caseId, { stage: r.stage, kind: r.kind, outs: [] })
-    byCase.get(r.caseId).outs.push(r.status === 'scored' ? `${r.outcome}${r.pass ? '' : ' ✗'}` : r.status)
+    byCase.get(r.caseId).outs.push(r.status === 'scored' ? `${outcomeLabel(r)}${r.pass ? '' : ' ✗'}` : r.status)
   }
   for (const [id, x] of byCase) lines.push(`| ${id} | ${x.stage} | ${x.kind} | ${x.outs.join(', ')} |`)
   const timed = rows.filter(r => typeof r.durationMs === 'number')
@@ -33,7 +41,7 @@ function formatGroup(rows, run) {
     lines.push('', `Slowest call: ${slow.caseId} ${Math.round(slow.durationMs / 1000)} s.`)
   }
   const failed = rows.filter(r => r.status === 'failed')
-  if (failed.length) lines.push('', 'Failed calls:', ...failed.map(r => `- ${r.key}: ${r.error}`))
+  if (failed.length) lines.push('', 'Failed calls:', ...failed.map(r => `- ${r.key}${r.subtype ? ` (${r.subtype})` : ''}: ${r.error}`))
   return lines.join('\n')
 }
 

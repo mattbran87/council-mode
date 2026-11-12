@@ -33,14 +33,25 @@ export const STAGES = {
   ruling: { model: 'opus', schema: H.RULING_SCHEMA },
 }
 
-const PASS_SHARE = 5 / 6
+// A stage needs at least 5 of every 6 planned runs of each kind to be valid, and 5 of 6 of the valid runs to pass.
+const minOf = n => Math.ceil((5 * n) / 6)
+
+export const DEFAULT_START_CONFIDENCE = 75
+export const startConfidence = c => c.claim.confidence ?? DEFAULT_START_CONFIDENCE
+
+export function planFor(cases, repeats) {
+  const plan = {}
+  for (const stage of Object.keys(STAGES)) plan[stage] = { trap: 0, control: 0 }
+  for (const c of cases) if (plan[c.stage] && c.kind in plan[c.stage]) plan[c.stage][c.kind] += repeats
+  return plan
+}
 
 export function buildPrompt(c) {
   if (c.stage === 'ruling') {
     return H.rulingPrompt({ items: [{ challenge: c.challenge, reply: c.defense }] }, c.claim)
   }
   const own = H.numberCase('K', {
-    claims: [{ evidence: c.claim.evidence, text: c.claim.text, source: c.claim.source || '', confidence: c.claim.confidence ?? 75 }],
+    claims: [{ evidence: c.claim.evidence, text: c.claim.text, source: c.claim.source || '', confidence: startConfidence(c) }],
     weaknesses: [],
     failedTests: [],
   })
@@ -57,9 +68,17 @@ export function checkShape(stage, out) {
     isStr(r.evidence) && Number.isInteger(r.newConfidence) && isStr(r.dropReason) && isStr(r.reason))
 }
 
+const ch1 = out => (out.replies || []).find(x => String(x.challengeId || '').trim().toUpperCase() === 'CH1')
+
+// The confidence the reply gives the claim after CH1, or null when there is none.
+export function newConfidence(out) {
+  const r = out && ch1(out)
+  return r && Number.isInteger(r.newConfidence) ? r.newConfidence : null
+}
+
 export function outcome(c, out) {
   if (c.stage === 'ruling') return out.claimHolds ? 'holds' : 'falls'
-  const r = (out.replies || []).find(x => String(x.challengeId || '').trim().toUpperCase() === 'CH1')
+  const r = ch1(out)
   return r ? r.kind : 'missing'
 }
 
@@ -70,7 +89,7 @@ export function passed(c, oc) {
   return oc === 'concede' || oc === 'partial'
 }
 
-export function score(rows) {
+export function score(rows, plan) {
   const out = {}
   for (const stage of Object.keys(STAGES)) {
     const s = { trap: { passed: 0, valid: 0 }, control: { passed: 0, valid: 0 }, invalid: 0, failed: 0 }
@@ -79,8 +98,16 @@ export function score(rows) {
       else if (r.status === 'failed') s.failed++
       else if (r.status === 'scored') { s[r.kind].valid++; if (r.pass) s[r.kind].passed++ }
     }
-    const share = k => (s[k].valid ? s[k].passed / s[k].valid : 0)
-    s.pass = s.trap.valid > 0 && s.control.valid > 0 && share('trap') >= PASS_SHARE && share('control') >= PASS_SHARE
+    const planned = plan[stage]
+    const enough = k => s[k].valid >= minOf(planned[k])
+    const holds = k => s[k].valid > 0 && s[k].passed * 6 >= s[k].valid * 5
+    const complete = s.failed === 0 && s.invalid === 0 && s.trap.valid >= planned.trap && s.control.valid >= planned.control
+    s.planned = planned
+    if (!enough('trap') || !enough('control')) { s.result = 'incomplete'; s.confidence = 'Low' }
+    else {
+      s.result = holds('trap') && holds('control') ? 'PASS' : 'FAIL'
+      s.confidence = complete ? 'High' : 'Medium'
+    }
     out[stage] = s
   }
   return out

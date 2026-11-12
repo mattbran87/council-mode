@@ -24,7 +24,7 @@ test('validateCase reports each problem', () => {
   assert.match(validateCase({ id: 'x', stage: 'reply', kind: 'trap', problem: 'p', option: 'o', claim: { evidence: 'reasoned', text: 'a' }, challenge: { text: 'b', evidence: 'c' }, expect: 'concede' }).join(' '), /expect/)
 })
 
-import { buildPrompt, STAGES, checkShape, outcome, passed, score } from '../evals/lib/probe-core.mjs'
+import { buildPrompt, STAGES, checkShape, outcome, passed, score, planFor, newConfidence } from '../evals/lib/probe-core.mjs'
 
 const byId = id => loadCases().find(c => c.id === id)
 
@@ -73,19 +73,53 @@ test('outcome and passed follow the spec scoring', () => {
   assert.equal(passed(rt, 'holds'), true)
 })
 
-test('score gives per-stage shares and passes a stage only at 5 of 6 or better', () => {
+const PLAN6 = { reply: { trap: 6, control: 6 }, ruling: { trap: 6, control: 6 } }
+const scoredRows = (stage, kind, n, passN) => Array.from({ length: n }, (_, i) => ({ stage, kind, status: 'scored', pass: i < passN }))
+
+test('planFor counts cases of each stage and kind times repeats', () => {
+  const plan = planFor(loadCases(), 3)
+  assert.deepEqual(plan, { reply: { trap: 6, control: 6 }, ruling: { trap: 6, control: 6 } })
+  assert.deepEqual(planFor(loadCases(), 1).reply, { trap: 2, control: 2 })
+})
+
+test('score gives per-stage shares, a result, and a confidence', () => {
   const rows = [
-    ...Array.from({ length: 6 }, (_, i) => ({ stage: 'ruling', kind: 'trap', status: 'scored', pass: i < 5 })),
-    ...Array.from({ length: 6 }, (_, i) => ({ stage: 'ruling', kind: 'control', status: 'scored', pass: i < 4 })),
+    ...scoredRows('ruling', 'trap', 6, 5),
+    ...scoredRows('ruling', 'control', 6, 4),
     { stage: 'ruling', kind: 'control', status: 'invalid' },
     { stage: 'reply', kind: 'trap', status: 'failed' },
   ]
-  const s = score(rows)
+  const s = score(rows, PLAN6)
   assert.deepEqual(s.ruling.trap, { passed: 5, valid: 6 })
   assert.deepEqual(s.ruling.control, { passed: 4, valid: 6 })
   assert.equal(s.ruling.invalid, 1)
-  assert.equal(s.ruling.pass, false)
-  assert.equal(s.reply.pass, false)
+  assert.equal(s.ruling.result, 'FAIL')
+  assert.equal(s.ruling.confidence, 'Medium')
+  assert.equal(s.reply.result, 'incomplete')
+  assert.equal(s.reply.confidence, 'Low')
+})
+
+test('score: all planned runs valid and at 5 of 6 or better is PASS with High confidence', () => {
+  const rows = [...scoredRows('reply', 'trap', 6, 5), ...scoredRows('reply', 'control', 6, 6)]
+  const s = score(rows, PLAN6)
+  assert.equal(s.reply.result, 'PASS')
+  assert.equal(s.reply.confidence, 'High')
+})
+
+test('score: 5 valid of 6 planned still decides, with Medium confidence; 4 valid is incomplete', () => {
+  const five = score([...scoredRows('reply', 'trap', 5, 5), ...scoredRows('reply', 'control', 6, 6), { stage: 'reply', kind: 'trap', status: 'failed' }], PLAN6)
+  assert.equal(five.reply.result, 'PASS')
+  assert.equal(five.reply.confidence, 'Medium')
+  const four = score([...scoredRows('reply', 'trap', 4, 4), ...scoredRows('reply', 'control', 6, 6), { stage: 'reply', kind: 'trap', status: 'failed' }, { stage: 'reply', kind: 'trap', status: 'invalid' }], PLAN6)
+  assert.equal(four.reply.result, 'incomplete')
+  assert.equal(four.reply.confidence, 'Low')
+})
+
+test('score: a stage with no rows is incomplete, and a plan of 1 per kind needs that run', () => {
+  assert.equal(score([], PLAN6).ruling.result, 'incomplete')
+  const one = { reply: { trap: 1, control: 1 }, ruling: { trap: 1, control: 1 } }
+  assert.equal(score([...scoredRows('reply', 'trap', 1, 1), ...scoredRows('reply', 'control', 1, 1)], one).reply.result, 'PASS')
+  assert.equal(score(scoredRows('reply', 'trap', 1, 1), one).reply.result, 'incomplete')
 })
 
 import { buildArgs, parseOutput, runClaude, PER_CALL_CAP_USD } from '../evals/lib/claude.mjs'
@@ -97,6 +131,8 @@ test('buildArgs sends model, budget, schema, and web tools only', () => {
   assert.equal(a[a.indexOf('--max-budget-usd') + 1], '0.2500')
   assert.equal(a[a.indexOf('--json-schema') + 1], '{"type":"object"}')
   assert.equal(a[a.indexOf('--tools') + 1], 'WebSearch,WebFetch')
+  assert.equal(a[a.indexOf('--allowedTools') + 1], 'WebSearch,WebFetch')
+  assert.ok(a.includes('--safe-mode'))
 })
 
 test('parseOutput reads structured output, cost, and errors', () => {
@@ -105,6 +141,10 @@ test('parseOutput reads structured output, cost, and errors', () => {
   const err = parseOutput(JSON.stringify({ is_error: true, result: 'budget exceeded', total_cost_usd: 0.5 }))
   assert.equal(err.ok, false)
   assert.match(err.error, /budget exceeded/)
+  const sub = parseOutput(JSON.stringify({ is_error: true, subtype: 'error_max_budget_usd', result: 'stopped' }))
+  assert.equal(sub.error, 'error_max_budget_usd: stopped')
+  assert.equal(sub.subtype, 'error_max_budget_usd')
+  assert.equal(parseOutput(JSON.stringify({ is_error: true })).error, 'error: CLI reported an error')
   assert.equal(parseOutput('not json').ok, false)
   const noStruct = parseOutput(JSON.stringify({ is_error: false, total_cost_usd: 0.01, result: '{"claimHolds":false,"checked":"x","note":"y"}' }))
   assert.deepEqual(noStruct.output, { claimHolds: false, checked: 'x', note: 'y' })
@@ -147,8 +187,8 @@ test('runProbe scores all cases 3 times and the report shows both stages passing
   const root = tmpRoot()
   const res = runProbe({ runId: 't1', budgetUsd: 5, repeats: 3, root, runner: goodModel, argv0: ['claude'], scriptCommit: 'abc1234' })
   assert.equal(res.rows.length, 24)
-  assert.equal(res.score.reply.pass, true)
-  assert.equal(res.score.ruling.pass, true)
+  assert.equal(res.score.reply.result, 'PASS')
+  assert.equal(res.score.ruling.result, 'PASS')
   const md = formatReport(res.rows, res.run)
   assert.match(md, /abc1234/)
   assert.match(md, /\| reply \| 6\/6 \| 6\/6 \| 0 \| PASS \|/)
@@ -247,4 +287,33 @@ test('formatReport names the rows\' script commit, not the first run\'s', async 
   const rows = [{ key: 'a#1@new', scriptCommit: 'new', caseId: 'a', stage: 'ruling', kind: 'trap', status: 'scored', outcome: 'holds', pass: true, cost: 0.1 }]
   const md = formatReport(rows, { runId: 'r', scriptCommit: 'old', budgetUsd: 5, spent: 0.1 })
   assert.match(md, /Script commit new\./)
+})
+
+test('a failed call keeps its error subtype on the row and in the report', () => {
+  const failing = () => ({ status: 1, stdout: JSON.stringify({ is_error: true, subtype: 'error_max_budget_usd', result: 'over budget', total_cost_usd: 0.1 }), stderr: '' })
+  const res = runProbe({ runId: 't10', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: failing, argv0: ['claude'], scriptCommit: 'x' })
+  assert.equal(res.rows[0].subtype, 'error_max_budget_usd')
+  assert.match(res.rows[0].error, /^error_max_budget_usd: over budget/)
+  const md = formatReport(res.rows, res.run)
+  assert.match(md, /Failed calls:/)
+  assert.match(md, /(error_max_budget_usd)/)
+  assert.match(md, /Low |/)
+})
+
+test('reply rows keep start and new confidence, and the report shows a partial as start→new', () => {
+  const partial = (cmd, args, opts) => {
+    const r = goodModel(cmd, args, opts)
+    const j = JSON.parse(r.stdout)
+    if (j.structured_output.replies) { j.structured_output.replies[0].kind = 'partial'; j.structured_output.replies[0].newConfidence = 62 }
+    return { ...r, stdout: JSON.stringify(j) }
+  }
+  const cases = loadCases().filter(c => c.stage === 'reply')
+  const res = runProbe({ runId: 't11', budgetUsd: 5, repeats: 1, root: tmpRoot(), runner: partial, argv0: ['claude'], scriptCommit: 'x', cases })
+  const row = res.rows[0]
+  assert.equal(row.newConfidence, 62)
+  assert.equal(row.startConfidence, cases[0].claim.confidence ?? 75)
+  const md = formatReport(res.rows, res.run)
+  assert.match(md, new RegExp(`partial ${row.startConfidence}→62`))
+  const old = res.rows.map(r => { const { startConfidence, newConfidence, ...rest } = r; return rest })
+  assert.match(formatReport(old, res.run), /partial →62/)
 })

@@ -5,7 +5,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { loadCases, validateCase, buildPrompt, STAGES, checkShape, outcome, passed, score } from './lib/probe-core.mjs'
+import { loadCases, validateCase, buildPrompt, STAGES, checkShape, outcome, passed, score, planFor, startConfidence, newConfidence } from './lib/probe-core.mjs'
 import { runClaude, claudeArgv, PER_CALL_CAP_USD } from './lib/claude.mjs'
 import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 
@@ -37,7 +37,7 @@ export function runProbe({ runId, budgetUsd = 5, repeats = 3, root = RUNS_ROOT, 
   const run = openRun(runId, root)
   const info = run.readRunInfo() || { runId, scriptCommit: commit, budgetUsd, repeats, started: new Date().toISOString() }
   run.writeRunInfo({ ...info, budgetUsd })
-  const result = extra => ({ rows: run.latest(), score: score(run.latest().filter(r => r.scriptCommit === commit)), run: { ...info, budgetUsd, spent: run.spent() }, ...extra })
+  const result = extra => ({ rows: run.latest(), score: score(run.latest().filter(r => r.scriptCommit === commit), planFor(cases, repeats)), run: { ...info, budgetUsd, spent: run.spent() }, ...extra })
   if (!argv0) return result({ stoppedBy: 'no-claude', lastError: 'claude is not on the PATH' })
 
   const done = new Set(run.latest().filter(r => r.status !== 'failed').map(r => r.key))
@@ -56,12 +56,13 @@ export function runProbe({ runId, budgetUsd = 5, repeats = 3, root = RUNS_ROOT, 
         cost: res.cost ?? PER_CALL_CAP_USD, costEstimated: res.cost == null, durationMs: res.durationMs ?? null,
       }
       if (!res.ok) {
-        row.status = 'failed'; row.error = res.error; streak++; lastError = res.error
+        row.status = 'failed'; row.error = res.error; if (res.subtype) row.subtype = res.subtype; streak++; lastError = res.error
       } else if (!checkShape(c.stage, res.output)) {
         row.status = 'invalid'; row.output = res.output; streak = 0
       } else {
         const oc = outcome(c, res.output)
         row.status = 'scored'; row.outcome = oc; row.pass = passed(c, oc); row.output = res.output; streak = 0
+        if (c.stage === 'reply') { row.startConfidence = startConfidence(c); row.newConfidence = newConfidence(res.output) }
       }
       run.append(row)
       if (streak >= MAX_FAILURE_STREAK) return result({ stoppedBy: 'failures', lastError })
