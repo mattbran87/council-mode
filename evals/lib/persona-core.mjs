@@ -147,7 +147,15 @@ export function summarize(results, voters, versions = VERSIONS) {
       }
     })
     byVoter.push(...cells)
+    // Panel diversity: how the valid ballots' first choices spread across options.
+    const firstChoices = {}
+    for (const r of rs.filter(x => x.status === 'valid')) firstChoices[r.ranking[0]] = (firstChoices[r.ranking[0]] || 0) + 1
+    const firstCounts = Object.values(firstChoices)
+    const validCount = firstCounts.reduce((s, x) => s + x, 0)
     byVersion[version] = {
+      firstChoices,
+      distinctFirst: firstCounts.length,
+      topFirstShare: validCount ? Math.max(...firstCounts) / validCount : null,
       valid: rs.filter(r => r.status === 'valid').length,
       invalid: rs.filter(r => r.status === 'invalid').length,
       missing: rs.filter(r => r.status === 'missing').length,
@@ -199,6 +207,16 @@ export function formatPersonaReport(summary, run, failed = []) {
     '',
     `Verdicts (tied share at least ${MIN_GAIN.toFixed(2)} higher and spread not higher): ${v.length ? v.join('; ') : 'none'}.`,
     'Each version has at most 21 ballots, so only large differences show.',
+    '',
+    'Panel diversity: first choices across valid ballots. A top share near 1 means the panel herds onto one option.',
+    '',
+    '| Version | Distinct first choices | Top first-choice share | First choices |',
+    '| --- | --- | --- | --- |',
+    ...versions.map(k => {
+      const x = byVersion[k]
+      const list = Object.entries(x.firstChoices || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([l, n]) => `${l} ${n}`).join(', ')
+      return `| ${k} | ${x.distinctFirst ?? 0} | ${f2(x.topFirstShare)} | ${list || 'none'} |`
+    }),
     '',
     '| Voter | Version | Valid | Tied share | Same winner | Ranking spread |',
     '| --- | --- | --- | --- | --- | --- |',

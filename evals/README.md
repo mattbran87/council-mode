@@ -123,6 +123,7 @@ The measures:
 - **Rejects violations:** adjacent pairs where the higher option breaks the voter's "Rejects" line.
 - **Same winner:** how many repeats pick the most common first choice.
 - **Ranking spread:** the mean count of option pairs in a different order between 2 repeats.
+- **Panel diversity:** the distinct first choices across a version's valid ballots, and the share of the most common one. A share near 1 means the panel herds onto one option.
 
 The decision rule: version A beats version B when A's tied share is at least 0.10 higher and A's ranking spread is not higher. Each version has at most 21 ballots, so only large differences show.
 

@@ -214,3 +214,22 @@ test('no claude on the PATH stops before any call', () => {
   assert.equal(res.stoppedBy, 'no-claude')
   assert.equal(res.rows.length, 0)
 })
+
+test('summarize counts first choices per version, and the report shows panel diversity', () => {
+  const vs = [{ name: 'A' }, { name: 'B' }]
+  const results = [
+    result('A', 'v1', 1, ['M', 'K'], 1), result('B', 'v1', 1, ['M', 'K'], 1),
+    result('A', 'v2', 1, ['M', 'K'], 1), result('B', 'v2', 1, ['K', 'M'], 1),
+    { voter: 'A', version: 'v3', attempt: 1, status: 'invalid' },
+  ]
+  const s = summarize(results, vs, ['v1', 'v2', 'v3'])
+  assert.deepEqual(s.byVersion.v1.firstChoices, { M: 2 })
+  assert.equal(s.byVersion.v1.distinctFirst, 1)
+  assert.equal(s.byVersion.v1.topFirstShare, 1)
+  assert.deepEqual(s.byVersion.v2.firstChoices, { M: 1, K: 1 })
+  assert.equal(s.byVersion.v2.topFirstShare, 0.5)
+  assert.equal(s.byVersion.v3.distinctFirst, 0)
+  assert.equal(s.byVersion.v3.topFirstShare, null)
+  const md = formatPersonaReport(s, { runId: 'r', scriptCommit: 'x', budgetUsd: 10, spent: 1 }, [])
+  assert.match(md, /\| v2 \| 2 \| 0\.50 \| K 1, M 1 \|/)
+})
