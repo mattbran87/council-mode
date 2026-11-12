@@ -64,3 +64,18 @@ The judge tied 19 of 105 reasons to the Rejects line under S0, and 3 of 105 unde
 **Open question.** The Rejects line did not prevent violations. Voters who saw it still ranked an option the judge read as breaking it above one that didn't, about once every 2 ballots. This run cannot tell whether voters override their own limit when other evidence is strong, or whether the judge flags too freely.
 
 **Decision (user, 2026-11-12).** Keep the Accepts and Rejects lines in the template. Evidence log: E6 and E7.
+
+## S3: top 2 items
+
+**Result.**
+- **Adherence:** 0.93 → 0.89.
+- **Coverage:** 0.94 → 0.90.
+- **Top-item weight:** 0.52 → 0.67. This passed its bar.
+- **Ranking spread:** 0.48 → 0.38.
+- **Top first-choice share:** 0.86 → 0.81, the most diverse of the 5 versions.
+
+Voters argued from item 3 in 11 of 105 reasons when the sheet showed it, and in 1 when it didn't.
+
+**What it shows.** A 2-item sheet loses little. Coverage fell by 0.04, and S3 kept the minority pick: the platform team maintainer picked JavaScript 3 times out of 3. This agrees with the value-profile study, where 2 query-relevant values beat a full profile. The passed top-item weight bar is mechanical: with 2 items, more "Cares about" reasons land on item 1 because there are fewer items to spread across. S3's small leads in stability and diversity are under their bars.
+
+**Decision (user, 2026-11-12).** Keep 3 items as the default. Step 1 of the skill now says: "Give 3 ranked "Cares about" items. 2 is enough when a third item would not separate the options." Evidence log: E8.
