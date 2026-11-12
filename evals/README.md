@@ -7,6 +7,7 @@ Two layers check that Council Mode does what its design claims, and the persona 
 | 1. Invariant checks on saved runs | `node evals/invariants.mjs [fixture dir ...]` | Free |
 | 2. Fake-evidence probe | `node evals/probe.mjs --run-id <id> --budget-usd 5` | 30 model calls (10 cases, 3 attempts each) |
 | Persona test | `node evals/persona.mjs --run-id <id> --budget-usd 10` | 63 voter calls and up to 63 judge calls |
+| Sheet-quality test | `node evals/sheets.mjs --run-id <id> --budget-usd 15` | 105 voter calls and up to 105 judge calls |
 
 ## Layer 1
 
@@ -128,6 +129,43 @@ The measures:
 The decision rule: version A beats version B when A's tied share is at least 0.10 higher and A's ranking spread is not higher. Each version has at most 21 ballots, so only large differences show.
 
 Run handling matches the probe: results go to `~/.claude/council-mode-evals/<run-id>/`, and the run stops at the budget cap or after 3 failed calls in a row. If you rerun the same run id, finished calls are skipped. A finished run therefore re-prints its report and rewrites `report.md` without new calls. If you edit `votePrompt`, change the voters file, or change the fixture, the calls run again under a new script label.
+
+## Sheet-quality test
+
+The sheet-quality test finds out which parts of the voter criteria sheet matter. Design: `docs/superpowers/specs/2026-11-12-council-mode-sheet-test-design.md`.
+
+Each version changes one thing from the production sheet:
+
+| Version | Sheet |
+| --- | --- |
+| S0 | 3 ranked "Cares about" items + Accepts + Rejects (production) |
+| S1 | The same 3 items, marked "in no particular order", in a seeded shuffle |
+| S2 | The 3 ranked items, with no Accepts or Rejects line |
+| S3 | The top 2 ranked items + Accepts + Rejects |
+| S4 | 5 ranked items + Accepts + Rejects |
+
+Run it:
+
+```bash
+node evals/sheets.mjs --run-id 2026-11-12-sheets1 --budget-usd 15
+```
+
+Options:
+
+- `--budget-usd`: the dollar cap for the run. The default is 15.
+- `--repeats`: the attempts per voter and version. The default is 3.
+
+The voters are in `sheet-voters-5lang.json`: the 7 voters of the 5-language follow-up, each with 5 ranked items. The dossier comes from `fixtures/2026-11-12-cli-5lang/`. The run uses the persona test's runner, so budget, resume, the failure stop, and the run folder work the same way.
+
+The judge always scores against the full reference sheet: 5 ranked items, Accepts, and Rejects. It never sees the version or the voter's name. One judge call gives all the measures:
+
+- **Adherence:** reasons tied to a line the voter's own sheet shows, divided by all reasons.
+- **Coverage:** reasons tied to any reference line, divided by all reasons.
+- **Top-item weight:** reasons that serve the #1 item, divided by reasons tied to any "Cares about" item. This tests ranking (S1 against S0).
+- **Rejects violations:** adjacent pairs where the higher option breaks the Rejects line. This tests the limits (S2 against S0).
+- **Stability and panel diversity:** as in the persona test.
+
+The decision rule compares each version with S0. A difference counts when the gap is at least 0.10 for adherence, coverage, or top-item weight, 0.15 for the top first-choice share, or 0.5 for mean rejects violations. Each version has at most 21 ballots, so only large effects show.
 
 ## The findings loop
 
