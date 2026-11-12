@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Persona test: node evals/persona.mjs --run-id <id> [--budget-usd 10] [--repeats 3]
+// Persona test: node evals/persona.mjs --run-id <id> [--budget-usd 10] [--repeats 3] [--fixture <dir>] [--voters <file>]
 import { writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { H } from './lib/helpers.mjs'
 import { loadFixture } from './lib/fixture.mjs'
@@ -9,7 +9,7 @@ import { runClaude, claudeArgv, PER_CALL_CAP_USD } from './lib/claude.mjs'
 import { openRun, RUNS_ROOT } from './lib/runstore.mjs'
 import { scriptCommit } from './probe.mjs'
 import {
-  loadVoters, VERSIONS, JUDGE_MODEL, JUDGE_SCHEMA, votePromptFor, orderFor, judgePrompt,
+  loadVoters, VOTERS_PATH, VERSIONS, JUDGE_MODEL, JUDGE_SCHEMA, votePromptFor, orderFor, judgePrompt,
   evaluate, summarize, formatPersonaReport,
 } from './lib/persona-core.mjs'
 
@@ -25,8 +25,8 @@ export function runPersonaTest({
   const { dossier, options } = fx.run
   const labels = options.map(o => o.label)
   const ids = H.dossierIds(dossier)
-  // The label changes when the vote prompt or the voters file changes, so either edit reruns the calls.
-  const label = `${commit}/${voters.hash}`
+  // The label changes with the vote prompt, the voters file, or the fixture, so any of them reruns the calls.
+  const label = `${commit}/${voters.hash}/${basename(fixtureDir)}`
   const run = openRun(runId, root)
   const info = run.readRunInfo() || { runId, kind: 'persona', started: new Date().toISOString() }
   run.writeRunInfo({ ...info, scriptCommit: label, budgetUsd, repeats })
@@ -90,12 +90,14 @@ function arg(name, fallback) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const usage = 'usage: node evals/persona.mjs --run-id <id> [--budget-usd 10] [--repeats 3]'
+  const usage = 'usage: node evals/persona.mjs --run-id <id> [--budget-usd 10] [--repeats 3] [--fixture <dir>] [--voters <file>]'
   const runId = arg('run-id')
   const budgetUsd = Number(arg('budget-usd', 10))
   const repeats = Number(arg('repeats', 3))
   if (!runId || !Number.isFinite(budgetUsd) || budgetUsd <= 0 || !Number.isInteger(repeats) || repeats < 1) { console.error(usage); process.exit(2) }
-  const res = runPersonaTest({ runId, budgetUsd, repeats })
+  const fixtureDir = arg('fixture', FIXTURE_DIR)
+  const voters = loadVoters(arg('voters', VOTERS_PATH))
+  const res = runPersonaTest({ runId, budgetUsd, repeats, fixtureDir, voters })
   const md = formatPersonaReport(res.summary, res.run, res.rows.filter(r => r.status === 'failed'))
   writeFileSync(join(res.dir, 'report.md'), md)
   console.log(md)

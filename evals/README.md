@@ -106,6 +106,8 @@ Options:
 
 - `--budget-usd`: the dollar cap for the run. The default is 10.
 - `--repeats`: the attempts per voter and version. The default is 3.
+- `--fixture`: the fixture folder whose dossier the voters rank. The default is `fixtures/2026-11-11-cli-language/`.
+- `--voters`: the voters file. The default is `persona-voters.json`.
 
 What a run does:
 
