@@ -229,3 +229,30 @@ test('formatSheet2Report shows the table, the differences from V0, the headline,
   assert.match(md, /at most 21 ballots/)
   assert.ok(!/Coverage/.test(md))
 })
+
+import { runSheet2Test } from '../evals/sheets2.mjs'
+
+test('runSheet2Test runs 5 versions, asks V3 and V4 for an assessment, and judges against the definitions', () => {
+  const calls = []
+  const runner = (cmd, args, opts) => {
+    calls.push({ input: opts.input, schema: JSON.parse(args[args.indexOf('--json-schema') + 1]) })
+    return fakeModel(cmd, args, opts)
+  }
+  const res = runSheet2Test({ ...base, runId: 'e1', repeats: 1, root: tmpRoot(), runner })
+  assert.equal(calls.length, 7 * 5 * 2)
+  const votes = calls.filter(c => c.input.startsWith('You are a voter'))
+  const assessed = votes.filter(c => c.input.includes(ASSESSMENT_RULE))
+  assert.equal(assessed.length, 14)
+  assert.ok(assessed.every(c => 'assessment' in c.schema.properties))
+  assert.ok(votes.filter(c => !c.input.includes(ASSESSMENT_RULE)).every(c => !('assessment' in c.schema.properties)))
+  assert.equal(votes.filter(c => c.input.includes('Serves it: ')).length, 14)
+  assert.equal(votes.filter(c => c.input.includes(PRIORITY_LINES[0])).length, 14)
+  const judges = calls.filter(c => c.input.startsWith("You check whether a voter's ballot"))
+  assert.equal(judges.length, 35)
+  assert.ok(judges.every(c => c.input.includes('  serves it: ') && !/\bV[0-4]\b/.test(c.input)))
+  assert.equal(res.summary.byVersion.V0.adherence, 1)
+  assert.equal(res.summary.byVersion.V0.assessed, null)
+  assert.equal(res.summary.byVersion.V3.assessed, 1)
+  assert.equal('coverage' in res.summary.byVersion.V4, false)
+  assert.equal(res.stoppedBy, null)
+})
