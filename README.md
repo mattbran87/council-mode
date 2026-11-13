@@ -8,7 +8,7 @@ A Claude Code plugin for decisions that are expensive to reverse and have 3 or m
 ## Install
 
 ```
-/plugin marketplace add C:\Users\marko\source\repos\council-mode
+/plugin marketplace add mattbran87/council-mode
 /plugin install council-mode@council-mode
 ```
 
@@ -36,3 +36,7 @@ Do not run `claude plugin validate --strict`. The plugin sets no `version`, so `
 The workflow script must stay plain JavaScript, start with `export const meta`, and never call `Date.now()`, `Math.random()`, or argless `new Date()`. Helper code lives between the `// --- pure helpers start` and `// --- pure helpers end` markers, which `tests/harness.mjs` loads directly.
 
 Evals: `node evals/invariants.mjs` checks saved runs for free; `node evals/probe.mjs --run-id <id> --budget-usd 5` runs the fake-evidence probe. See [evals/README.md](evals/README.md).
+
+## License
+
+[MIT](LICENSE)

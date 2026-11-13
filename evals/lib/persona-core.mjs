@@ -22,7 +22,7 @@ export function parseCriteria(criteria) {
   }
 }
 
-// The production identity block before the priority lines were added (workflow commit 1a8ce56).
+// The production identity block before the priority lines were added (workflow commit c5e8fbd).
 // The persona, sheet, and sheet v2 tests ran with it, so they keep it and stay reproducible.
 export function identityBefore(persona) {
   return [`You are a voter on a decision panel. Your persona: ${persona.name}.`, 'Your criteria sheet:', persona.criteria].join('\n')

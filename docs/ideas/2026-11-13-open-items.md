@@ -1,6 +1,6 @@
 # Open items after the sheet v2 test
 
-Status on 2026-11-13, with `main` at 224e5b8. Sources: `evals/FINDINGS-2026-11-12-sheet-v2.md`, `evals/FINDINGS-2026-11-12-sheets.md`, `evals/FINDINGS-2026-11-12-personas.md`, and `docs/research/evidence-log.md`.
+Status on 2026-11-13, with `main` at 1f5e02f. Sources: `evals/FINDINGS-2026-11-12-sheet-v2.md`, `evals/FINDINGS-2026-11-12-sheets.md`, `evals/FINDINGS-2026-11-12-personas.md`, and `docs/research/evidence-log.md`.
 
 The user will discuss items 1, 2, 3, and 5 one at a time before any decision.
 

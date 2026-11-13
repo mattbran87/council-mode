@@ -81,7 +81,7 @@ So the definition acts as a property proxy, like the "memory safety" item: it na
 
 **What it shows.** Telling voters how to weigh the sheet ties more reasons to it and lowers violations, with no measure getting worse. The platform team maintainer picked JavaScript 3 times out of 3 under V2, against 2 of 3 under V0, so its top item held.
 
-**Decision (user, 2026-11-12).** Add the 3 lines to the production voter prompt, inside `voterIdentity`, after the sheet (commit d1dc0fe). The persona, sheet, and sheet v2 tests keep the identity they ran with (`identityBefore` in `evals/lib/persona-core.mjs`), so they stay reproducible. Evidence log: E10.
+**Decision (user, 2026-11-12).** Add the 3 lines to the production voter prompt, inside `voterIdentity`, after the sheet (commit 9c54f47). The persona, sheet, and sheet v2 tests keep the identity they ran with (`identityBefore` in `evals/lib/persona-core.mjs`), so they stay reproducible. Evidence log: E10.
 
 ## V3: assessment first
 

@@ -200,3 +200,15 @@ The decision rule compares each version with V0, with the sheet-quality test's b
 2. Run `npm test`, then `node evals/invariants.mjs`.
 3. If a prompt or a debate helper changed, run the probe.
 4. Write `evals/FINDINGS-<date>.md`: what changed, the score table, what was right, what was wrong, and what to improve.
+
+## Old commit hashes in recorded data
+
+On 2026-11-13, the history was rewritten to change the commit email, so every commit hash changed. Recorded data keeps the old hashes: fixture `meta.json` files and the script labels in the findings files and in saved runs. Prose links to commits use the new hashes.
+
+| Old | New |
+| --- | --- |
+| `9b6455d` | `f23c2e2` |
+| `8395c2a` | `17d2908` |
+| `1a8ce56` | `c5e8fbd` |
+
+Do not rerun an old run id. The runner keys each call to a label that starts with the script commit. That hash changed, so a rerun repeats every paid call.
