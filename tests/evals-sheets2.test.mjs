@@ -53,3 +53,25 @@ test('runVoterTest sends the schema voteSchema picks for each version, and BALLO
   runVoterTest({ ...base, runId: 'h2', repeats: 1, root: tmpRoot(), runner, commit: 'abc', voters, fixtureDir: SHEETS_FIXTURE_DIR, test: make(null) })
   assert.deepEqual(seen, ['a| false', 'b| false'])
 })
+
+import { parseCriteria } from '../evals/lib/persona-core.mjs'
+
+const V2_PATH = new URL('../evals/sheet-voters-5lang-v2.json', import.meta.url)
+const PROD_PATH = new URL('../evals/persona-voters-5lang.json', import.meta.url)
+
+test('the v2 voters match the production voters, with a serves and a fails line for each item', () => {
+  const v2 = loadVoters(V2_PATH)
+  const prod = loadVoters(PROD_PATH)
+  assert.equal(v2.seed, prod.seed)
+  assert.equal(v2.voters.length, 7)
+  v2.voters.forEach((v, i) => {
+    const p = prod.voters[i]
+    const c = parseCriteria(p.criteria)
+    assert.equal(v.name, p.name)
+    assert.equal(v.model, p.model)
+    assert.deepEqual(v.cares.map(x => x.item), c.cares, v.name)
+    assert.equal(v.accepts, c.accepts, v.name)
+    assert.equal(v.rejects, c.rejects, v.name)
+    for (const x of v.cares) assert.ok(x.serves.trim() && x.fails.trim(), `${v.name}: ${x.item}`)
+  })
+})

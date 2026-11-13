@@ -1,0 +1,83 @@
+{
+  "seed": 20261113,
+  "note": "The 7 voters of persona-voters-5lang.json with their 3 production items, Accepts, and Rejects. Each item has the serves and fails lines the user approved on 2026-11-12 (spec: docs/superpowers/specs/2026-11-12-council-mode-sheet-v2-test-design.md).",
+  "voters": [
+    {
+      "name": "Everyday engineer user",
+      "model": "haiku",
+      "cares": [
+        { "item": "fast start", "serves": "Common commands answer well under 300 ms on all 3 OSes.", "fails": "Start time is near or over the limit, or grows as the tool grows." },
+        { "item": "easy install and update", "serves": "One command installs or updates it, with nothing to install first.", "fails": "The user must install or manage a runtime, package manager, or PATH setup." },
+        { "item": "clear help and errors", "serves": "Every command has built-in help, and errors say what went wrong and what to do.", "fails": "Errors show raw stack traces or codes with no next step." }
+      ],
+      "accepts": "a larger download",
+      "rejects": "a runtime they must manage themselves"
+    },
+    {
+      "name": "Platform team maintainer",
+      "model": "sonnet",
+      "cares": [
+        { "item": "speed of adding commands", "serves": "Most of the team can add a command in a day or two with existing patterns.", "fails": "A new command needs specialist knowledge or long build cycles." },
+        { "item": "debugging and test tooling", "serves": "A mature debugger and test framework the team knows, with fast local test runs.", "fails": "Weak or unfamiliar debugging and testing tools." },
+        { "item": "few dependencies", "serves": "The standard library covers most needs.", "fails": "Core features rely on many third-party packages." }
+      ],
+      "accepts": "some build complexity",
+      "rejects": "a codebase only 1 team member can change"
+    },
+    {
+      "name": "Future new hire",
+      "model": "sonnet",
+      "cares": [
+        { "item": "readable code", "serves": "A newcomer can follow a command's logic without special training.", "fails": "Following the code needs advanced language or framework knowledge." },
+        { "item": "size of the hiring pool", "serves": "Many developers on the job market already know the language.", "fails": "Few candidates know it, so new hires need long training." },
+        { "item": "quality of docs and examples", "serves": "Plenty of current official docs and examples for CLI, HTTP, and OAuth work.", "fails": "Docs for these tasks are sparse or outdated." }
+      ],
+      "accepts": "a less fashionable stack",
+      "rejects": "code that needs specialist knowledge to change"
+    },
+    {
+      "name": "Release engineer",
+      "model": "opus",
+      "cares": [
+        { "item": "reproducible builds for 3 OSes from one CI", "serves": "One CI pipeline builds all 3 OS binaries from the same source.", "fails": "A release needs a separate machine or manual steps per OS." },
+        { "item": "code signing on macOS and Windows", "serves": "CI signs and notarizes the artifacts with standard tools.", "fails": "Signing needs manual steps, or the artifacts are hard to sign." },
+        { "item": "small artifacts", "serves": "Each release download is a few megabytes.", "fails": "Each release ships a bundled runtime or a large download." }
+      ],
+      "accepts": "longer CI builds",
+      "rejects": "per-OS build machines kept by hand"
+    },
+    {
+      "name": "Security engineer",
+      "model": "opus",
+      "cares": [
+        { "item": "supply-chain risk of dependencies", "serves": "Few dependencies, pinned versions, and a tool to audit them.", "fails": "A large or unpinned dependency tree that is hard to audit." },
+        { "item": "memory safety", "serves": "The language prevents buffer overflows and use-after-free in normal code.", "fails": "Memory errors are possible in normal code." },
+        { "item": "fast toolchain patches", "serves": "A toolchain security fix can be rebuilt and released within a week.", "fails": "Fixes wait on users updating a runtime themselves." }
+      ],
+      "accepts": "fewer features",
+      "rejects": "unpinned or unaudited dependency trees"
+    },
+    {
+      "name": "Developer-experience support lead",
+      "model": "haiku",
+      "cares": [
+        { "item": "the same behavior on all 3 OSes", "serves": "One codebase behaves the same on all 3 OSes, with no OS branches in common commands.", "fails": "Paths, shells, or runtimes differ by OS and cause OS-specific bugs." },
+        { "item": "actionable error messages", "serves": "Errors name the cause and the fix.", "fails": "Errors are generic or show internals." },
+        { "item": "easy diagnostics from users", "serves": "One command collects version, environment, and logs for a ticket.", "fails": "Support must ask users to gather details by hand." }
+      ],
+      "accepts": "a slower feature pace",
+      "rejects": "OS-specific bugs that need per-machine fixes"
+    },
+    {
+      "name": "Engineering manager (5-year owner)",
+      "model": "sonnet",
+      "cares": [
+        { "item": "total cost of ownership", "serves": "Low build, run, and maintenance cost over 5 years with the current team.", "fails": "Hidden costs such as retraining, special build infrastructure, or rewrites." },
+        { "item": "staffing risk under turnover", "serves": "At least half the current team can maintain it, and replacements are easy to hire.", "fails": "It depends on 1 or 2 people or a rare skill." },
+        { "item": "long-term toolchain support", "serves": "The toolchain has a published support policy that covers 5 years.", "fails": "The toolchain's 5-year support is uncertain." }
+      ],
+      "accepts": "a higher first build cost",
+      "rejects": "a toolchain with uncertain 5-year support"
+    }
+  ]
+}
