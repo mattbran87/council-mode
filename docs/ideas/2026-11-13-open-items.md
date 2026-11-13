@@ -4,6 +4,8 @@ Status on 2026-11-13, with `main` at 1f5e02f. Sources: `evals/FINDINGS-2026-11-1
 
 The user will discuss items 1, 2, 3, and 5 one at a time before any decision.
 
+**Criteria sheet template:** `docs/research/criteria-sheet-template.md` gives the sheet format, the rule for each line with its evidence, and the block the voter sees. Items 1, 3, and 7 change the sheet, so each one names the template update it needs.
+
 **Recommended first step:** the hand check of Rejects violations (item 5). It costs nothing. It also tells us whether to trust the violation numbers in 3 runs, and test 4 rests on those numbers.
 
 ## A. Decisions waiting on the user
@@ -16,6 +18,8 @@ The user will discuss items 1, 2, 3, and 5 one at a time before any decision.
 - **What "hold" means.** Production keeps sheets without definitions. A lint (an automatic check of sheet text) would flag any definition that names a trait of one option. After the lint exists, we rerun V1 (item 6).
 - **The alternative.** Adopt definitions now and accept the noise. Recommended against: production calls each voter once, so a noisy voter adds random votes.
 - **Evidence log:** E11.
+- **Related rule (user, 2026-11-13).** Step 1 of the skill now bans a sheet line that names a property only 1 likely option has. That rule covers the line that caused E11, but only as an instruction to the writer. A lint would also check the sheets in code.
+- **Template.** If definitions are adopted, add their format to `docs/research/criteria-sheet-template.md`, and delete its "Add no item definitions yet" rule.
 
 ### 2. Do not adopt assessment-first
 
@@ -35,6 +39,7 @@ The user will discuss items 1, 2, 3, and 5 one at a time before any decision.
   - Reword the line so that it fits any count: "Each item counts more than the items below it." This is cheap, but the reworded line was never tested.
   - Build the line from the item count in `voterIdentity`. This keeps the tested wording for 3 items, but the criteria arrive as free text, so the code must count the items.
 - **Lean.** Build the line from the count, so the 3-item case keeps the exact wording that V2 tested.
+- **Template.** The "What the voter sees" section of `docs/research/criteria-sheet-template.md` notes this gap. Update that section with the fix.
 
 ## C. Next tests from the sheet v2 findings
 
@@ -60,6 +65,7 @@ The user will discuss items 1, 2, 3, and 5 one at a time before any decision.
 - **Why.** The judge tied 0 of 525 reasons in `2026-11-12-sheets2-1` to the Accepts line, and 3 in all earlier runs together (E14).
 - **Open question.** Either the line works as a silent trade-off, or it does nothing. The judge cannot see a silent trade-off, so only a removal test can tell. If rankings stay the same without it, sheets get shorter and easier to write.
 - **Note.** One V2 priority line names the Accepts line: "Give up what your Accepts line names before you give up any item." A removal test must also drop that line.
+- **Template.** If the Accepts line goes, drop it from `docs/research/criteria-sheet-template.md` and from the example in step 1 of the skill.
 
 ## D. Older open items
 
