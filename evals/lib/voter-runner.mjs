@@ -9,7 +9,8 @@ import { orderFor, evaluate } from './persona-core.mjs'
 export const MIN_CALL_USD = 0.01
 export const MAX_FAILURE_STREAK = 3
 
-// test: { kind, versions, votePrompt(version, voter, index, dossierText, order), judge: { model, schema, prompt(voter, ballot, options) }, measure(judgment, ballot, version) }
+// test: { kind, versions, votePrompt(version, voter, index, dossierText, order), voteSchema?(version), judge: { model, schema, prompt(voter, ballot, options) }, measure(judgment, ballot, version) }
+// voteSchema is optional; without it every voter call uses the production BALLOT_SCHEMA.
 export function runVoterTest({ runId, budgetUsd, repeats, root, runner, argv0, commit, voters, fixtureDir, test }) {
   const fx = loadFixture(fixtureDir)
   const { dossier, options } = fx.run
@@ -55,7 +56,7 @@ export function runVoterTest({ runId, budgetUsd, repeats, root, runner, argv0, c
   for (const c of cells) {
     const order = orderFor(voters.seed, c.i, labels)
     const prompt = test.votePrompt(c.version, c.voter, c.i, H.renderDossier(dossier, order), order)
-    call(`vote:${c.cell}@${label}`, { step: 'vote', ...meta(c) }, prompt, c.voter.model, H.BALLOT_SCHEMA)
+    call(`vote:${c.cell}@${label}`, { step: 'vote', ...meta(c) }, prompt, c.voter.model, test.voteSchema ? test.voteSchema(c.version) : H.BALLOT_SCHEMA)
   }
   // Then one judge call per valid ballot.
   const current = () => run.latest().filter(r => r.scriptCommit === label)
