@@ -1,5 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { H } from './helpers.mjs'
+import { mean } from './persona-core.mjs'
+import { sheetMeasures, summarizeSheets, differences, BARS } from './sheet-core.mjs'
 
 export const SHEETS2_VOTERS_PATH = fileURLToPath(new URL('../sheet-voters-5lang-v2.json', import.meta.url))
 export const SHEET2_VERSIONS = ['V0', 'V1', 'V2', 'V3', 'V4']
@@ -78,4 +80,64 @@ export function judge2Prompt(voter, ballot, options) {
     '- reasons: one entry per reason, by its number. serves: the one criterion the reason mainly argues from (cares1, cares2, …, accepts, or rejects), or none if it argues from something the criteria do not mention. note: a few words on why.',
     '- rejectsViolations: each adjacent pair where the higher option has what the rejects line rules out and the lower option does not. An empty list if there are none.',
   ].join('\n')
+}
+
+const optionLabel = x => String(x ?? '').trim().replace(/^option\s+/i, '').trim().toUpperCase()
+
+// Complete when every ranked option has a non-empty note.
+export function assessmentComplete(ballot) {
+  const noted = new Set((ballot.assessment || []).filter(a => String(a.note ?? '').trim()).map(a => optionLabel(a.option)))
+  return ballot.ranking.every(l => noted.has(l))
+}
+
+// Every v2 version shows the S0 lines (3 items, Accepts, Rejects), so adherence equals coverage and only adherence is kept.
+export function sheet2Measures(judgment, ballot, version) {
+  const { adherence, topWeight, violations } = sheetMeasures(judgment, ballot, 'S0')
+  return { adherence, topWeight, violations, assessed: ASSESSED.has(version) ? (assessmentComplete(ballot) ? 1 : 0) : null }
+}
+
+export function summarizeSheets2(results, voters, versions = SHEET2_VERSIONS) {
+  const s = summarizeSheets(results, voters, versions)
+  for (const version of versions) {
+    const x = s.byVersion[version]
+    delete x.coverage
+    const judged = results.filter(r => r.version === version && r.status === 'valid' && r.measures)
+    x.assessed = mean(judged.map(r => r.measures.assessed).filter(v => v !== null))
+  }
+  return s
+}
+
+const f2 = x => (x == null ? 'n/a' : x.toFixed(2))
+const signed = x => `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(2)}`
+
+export function formatSheet2Report(summary, run, failed = []) {
+  const { byVersion, byVoter } = summary
+  const versions = Object.keys(byVersion)
+  const diffs = differences(byVersion, 'V0')
+  const lines = [
+    `# Sheet v2 test ${run.runId}`,
+    '',
+    `Script ${run.scriptCommit}. Spend $${(run.spent ?? 0).toFixed(2)} of $${Number(run.budgetUsd).toFixed(2)}.`,
+    'V0 production. V1 + item definitions. V2 + priority instruction. V3 + assessment first. V4 all 3.',
+    '',
+    '| Version | Valid | Invalid | Missing | Adherence | Top-item weight | Rejects violations | Same winner | Ranking spread | Top first-choice share | Assessment coverage |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...versions.map(k => {
+      const x = byVersion[k]
+      return `| ${k} | ${x.valid} | ${x.invalid} | ${x.missing} | ${f2(x.adherence)} | ${f2(x.topWeight)} | ${f2(x.violations)} | ${f2(x.sameWinner)} | ${f2(x.spread)} | ${f2(x.topFirstShare)} | ${f2(x.assessed)} |`
+    }),
+    '',
+    `Differences from V0 that pass their bar (adherence and top-item weight ${BARS.adherence.toFixed(2)}; top first-choice share ${BARS.topFirstShare.toFixed(2)}; rejects violations and ranking spread ${BARS.violations.toFixed(2)}):`,
+    ...(diffs.length ? diffs.map(d => `- ${d.version}: ${d.measure} ${signed(d.gap)}`) : ['- none']),
+    '',
+    'V4 against V0 is the headline result. V1, V2, and V3 show which part did the work.',
+    'Assessment coverage: the share of judged V3 and V4 ballots with a note for every option.',
+    'Each version has at most 21 ballots, so only large effects show.',
+    '',
+    '| Voter | Version | Valid | Adherence | Same winner | Ranking spread |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...byVoter.map(c => `| ${c.voter} | ${c.version} | ${c.valid} | ${f2(c.adherence)} | ${c.sameWinner} | ${f2(c.spread)} |`),
+  ]
+  if (failed.length) lines.push('', 'Failed calls:', ...failed.map(r => `- ${r.key}${r.subtype ? ` (${r.subtype})` : ''}: ${r.error}`))
+  return lines.join('\n')
 }

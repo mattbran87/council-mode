@@ -177,3 +177,55 @@ test('the judge prompt holds the definitions, keeps the production rules, and na
   assert.ok(!/\bV[0-4]\b/.test(p))
   for (const v of v2.voters) assert.ok(!p.includes(v.name), v.name)
 })
+
+import { assessmentComplete, sheet2Measures, summarizeSheets2, formatSheet2Report } from '../evals/lib/sheet2-core.mjs'
+import { differences } from '../evals/lib/sheet-core.mjs'
+
+const judged = (...serves) => ({ reasons: serves.map((s, index) => ({ index, serves: s, note: '' })), rejectsViolations: [] })
+const b3 = assessment => ({ ranking: ['A', 'B', 'C'], reasons: [{}, {}], assessment })
+
+test('assessmentComplete needs a non-empty note for every ranked option', () => {
+  assert.equal(assessmentComplete(b3([{ option: 'A', note: 'x' }, { option: 'Option b', note: 'y' }, { option: 'c', note: 'z' }])), true)
+  assert.equal(assessmentComplete(b3([{ option: 'A', note: 'x' }, { option: 'B', note: ' ' }, { option: 'C', note: 'z' }])), false)
+  assert.equal(assessmentComplete(b3([{ option: 'A', note: 'x' }, { option: 'B', note: 'y' }])), false)
+  assert.equal(assessmentComplete(b3(undefined)), false)
+})
+
+test('sheet2Measures gives adherence, top weight, violations, and assessment only for V3 and V4', () => {
+  assert.deepEqual(sheet2Measures(judged('cares1', 'none'), b3([]), 'V0'), { adherence: 0.5, topWeight: 1, violations: 0, assessed: null })
+  assert.equal(sheet2Measures(judged('cares2', 'rejects'), b3([]), 'V3').assessed, 0)
+  const full = b3(['A', 'B', 'C'].map(option => ({ option, note: 'n' })))
+  assert.equal(sheet2Measures(judged('cares2', 'accepts'), full, 'V4').assessed, 1)
+  assert.equal(sheet2Measures(judged('cares2', 'accepts'), full, 'V4').adherence, 1)
+})
+
+const res = (voter, version, attempt, ranking, m) => ({ voter, version, attempt, status: 'valid', ranking, measures: m })
+
+test('summarizeSheets2 drops coverage, adds assessment coverage, and differences use V0 as the base', () => {
+  const vs = [{ name: 'A' }]
+  const m = (adherence, assessed) => ({ adherence, topWeight: 1, violations: 0, assessed })
+  const results = [
+    res('A', 'V0', 1, ['X', 'Y'], m(0.6, null)),
+    res('A', 'V3', 1, ['X', 'Y'], m(0.8, 1)), res('A', 'V3', 2, ['X', 'Y'], m(0.8, 0)),
+  ]
+  const s = summarizeSheets2(results, vs, ['V0', 'V3'])
+  assert.equal('coverage' in s.byVersion.V0, false)
+  assert.equal(s.byVersion.V0.assessed, null)
+  assert.equal(s.byVersion.V3.assessed, 0.5)
+  assert.deepEqual(differences(s.byVersion, 'V0').map(d => `${d.version} ${d.measure} ${d.gap.toFixed(2)}`), ['V3 adherence 0.20'])
+})
+
+test('formatSheet2Report shows the table, the differences from V0, the headline, and the sample-size warning', () => {
+  const vs = [{ name: 'A' }]
+  const m = (adherence, assessed) => ({ adherence, topWeight: 1, violations: 0, assessed })
+  const results = [res('A', 'V0', 1, ['X', 'Y'], m(0.6, null)), res('A', 'V4', 1, ['X', 'Y'], m(0.9, 1))]
+  const md = formatSheet2Report(summarizeSheets2(results, vs, ['V0', 'V4']), { runId: 'r', scriptCommit: 'x', budgetUsd: 15, spent: 2 }, [])
+  assert.match(md, /# Sheet v2 test r/)
+  assert.match(md, /\| V0 \| 1 \| 0 \| 0 \| 0\.60 \| 1\.00 \| 0\.00 \|/)
+  assert.match(md, /\| 1\.00 \|$/m)
+  assert.match(md, /V4: adherence \+0\.30/)
+  assert.match(md, /V4 against V0 is the headline/)
+  assert.match(md, /judged V3 and V4 ballots/)
+  assert.match(md, /at most 21 ballots/)
+  assert.ok(!/Coverage/.test(md))
+})
