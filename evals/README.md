@@ -8,6 +8,7 @@ Two layers check that Council Mode does what its design claims, and the persona 
 | 2. Fake-evidence probe | `node evals/probe.mjs --run-id <id> --budget-usd 5` | 30 model calls (10 cases, 3 attempts each) |
 | Persona test | `node evals/persona.mjs --run-id <id> --budget-usd 10` | 63 voter calls and up to 63 judge calls |
 | Sheet-quality test | `node evals/sheets.mjs --run-id <id> --budget-usd 15` | 105 voter calls and up to 105 judge calls |
+| Sheet v2 test | `node evals/sheets2.mjs --run-id <id> --budget-usd 15` | 105 voter calls and up to 105 judge calls |
 
 ## Layer 1
 
@@ -166,6 +167,32 @@ The judge always scores against the full reference sheet: 5 ranked items, Accept
 - **Stability and panel diversity:** as in the persona test.
 
 The decision rule compares each version with S0. A difference counts when the gap is at least 0.10 for adherence, coverage, or top-item weight, 0.15 for the top first-choice share, 0.5 for mean rejects violations, or 0.5 for ranking spread. The ranking-spread bar applies from the run after `2026-11-12-sheets1`. Each version has at most 21 ballots, so only large effects show.
+
+## Sheet v2 test
+
+The sheet v2 test checks 3 parts that published preference prompts have and the production voter prompt lacks. Design: `docs/superpowers/specs/2026-11-12-council-mode-sheet-v2-test-design.md`. Background: `docs/research/prompt-structures.md`.
+
+| Version | Change from production |
+| --- | --- |
+| V0 | None |
+| V1 | A "Serves it" and a "Fails it" line under each "Cares about" item |
+| V2 | 3 priority-instruction lines after the sheet |
+| V3 | An `assessment` field before `ranking` in the ballot, and a ballot rule to write it first |
+| V4 | V1 + V2 + V3 |
+
+Run it:
+
+```bash
+node evals/sheets2.mjs --run-id 2026-11-12-sheets2-1 --budget-usd 15
+```
+
+The options are the same as the sheet-quality test: `--budget-usd` (default 15) and `--repeats` (default 3).
+
+The voters are in `sheet-voters-5lang-v2.json`: the 7 production voters of the 5-language follow-up, with the approved definitions for each item. The dossier comes from `fixtures/2026-11-12-cli-5lang/`.
+
+The judge scores every version against one reference: the 3 items with their definitions, Accepts, and Rejects. Every version shows all of those lines, so adherence equals coverage, and the report shows adherence only. The report also gives assessment coverage: the share of judged V3 and V4 ballots with a note for every option.
+
+The decision rule compares each version with V0, with the sheet-quality test's bars: 0.10 for adherence or top-item weight, 0.15 for the top first-choice share, 0.5 for mean rejects violations, and 0.5 for ranking spread. V4 against V0 is the headline. Each version has at most 21 ballots, so only large effects show.
 
 ## The findings loop
 
