@@ -37,6 +37,8 @@ Write all of the following in one message, before you think about solutions.
 
    A criteria sheet must not name a solution approach. "Cares about latency" is allowed. "Prefers caching" is not.
 
+   A criteria sheet must not name a property that only 1 likely option has, because the line then votes for that option. "Cares about memory errors in production" is allowed. "Cares about memory safety" is not, when only 1 option is memory-safe.
+
    Give 3 ranked "Cares about" items, and no more than 3. 2 is enough when a third item would not separate the options.
 3. **Models.** Each persona gets `sonnet`, `opus`, or `haiku`; use at least 2 different models across the 7. Pick the advocate model, and a different referee model. `advocateModel` and `refereeModel` also take `sonnet`, `opus`, or `haiku`.
 4. **Research budget**, in words, such as "at most 15 tool calls; running tests is allowed". Every advocate gets the same budget.

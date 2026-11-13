@@ -40,7 +40,7 @@ Model: sonnet
 
 - **Name no solution approach.** "Cares about latency" is allowed. "Prefers caching" is not.
 - **Name no option.** If the user named options, keep them out of every sheet.
-- **Name no property that only 1 option has.** "Memory safety" or "a published 5-year support policy" acts as a vote for the option that has it. In the sheet v2 test, 1 such line decided a voter's ballots against its own item order (E11).
+- **Name no property that only 1 option has.** "Memory safety" or "a published 5-year support policy" acts as a vote for the option that has it. In the sheet v2 test, 1 such line decided a voter's ballots against its own item order (E11). Step 1 of the skill has this rule.
 - **Add no item definitions yet.** Definitions raised adherence but made voters less steady. They are on hold until a sheet-content lint exists (E11; open item 1 in `docs/ideas/2026-11-13-open-items.md`).
 
 ## What the voter sees

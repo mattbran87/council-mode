@@ -19,3 +19,7 @@ test('the skill names the workflow script and every workflow argument', () => {
     assert.ok(skill.includes(`\`${arg}\``), arg)
   }
 })
+
+test('a criteria sheet must not name a property that only 1 option has', () => {
+  assert.ok(skill.includes('A criteria sheet must not name a property that only 1 likely option has'))
+})
