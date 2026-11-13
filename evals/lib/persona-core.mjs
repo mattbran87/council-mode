@@ -22,10 +22,16 @@ export function parseCriteria(criteria) {
   }
 }
 
-// v1: described persona; v2: today's production block; v3: criteria with no name.
+// The production identity block before the priority lines were added (workflow commit 1a8ce56).
+// The persona, sheet, and sheet v2 tests ran with it, so they keep it and stay reproducible.
+export function identityBefore(persona) {
+  return [`You are a voter on a decision panel. Your persona: ${persona.name}.`, 'Your criteria sheet:', persona.criteria].join('\n')
+}
+
+// v1: described persona; v2: the production block as tested (identityBefore); v3: criteria with no name.
 export function identityFor(version, voter) {
   if (version === 'v1') return [`You are a voter on a decision panel. Your persona: ${voter.name}.`, 'About you:', voter.description].join('\n')
-  if (version === 'v2') return H.voterIdentity(voter)
+  if (version === 'v2') return identityBefore(voter)
   if (version === 'v3') return ['You are a voter on a decision panel.', 'Your criteria sheet:', voter.criteria].join('\n')
   throw new Error(`unknown version ${version}`)
 }

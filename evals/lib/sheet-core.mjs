@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { H } from './helpers.mjs'
-import { stability, firstChoiceStats, mean } from './persona-core.mjs'
+import { stability, firstChoiceStats, mean, identityBefore } from './persona-core.mjs'
 
 export const SHEETS_VOTERS_PATH = fileURLToPath(new URL('../sheet-voters-5lang.json', import.meta.url))
 export const SHEET_VERSIONS = ['S0', 'S1', 'S2', 'S3', 'S4']
@@ -33,7 +33,7 @@ export const OWN_LINES = {
 }
 
 export function sheetIdentity(version, voter, seed, index) {
-  return H.voterIdentity({ name: voter.name, criteria: sheetText(version, voter, seed, index) })
+  return identityBefore({ name: voter.name, criteria: sheetText(version, voter, seed, index) })
 }
 
 // Adherence: reasons tied to the voter's own lines. Coverage: reasons tied to any reference line.

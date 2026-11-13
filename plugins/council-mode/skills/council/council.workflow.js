@@ -646,12 +646,16 @@ function rulingPrompt(group, claim) {
   return lines.join('\n')
 }
 
-// The voter's identity: the persona name and criteria sheet. The eval swaps this block to test other identities.
+// The voter's identity: the persona name, the criteria sheet, and how to weigh it. The eval swaps this block to test other identities.
+// The 3 weighing lines come from the sheet v2 test (evals/FINDINGS-2026-11-12-sheet-v2.md).
 function voterIdentity(persona) {
   return [
     `You are a voter on a decision panel. Your persona: ${persona.name}.`,
     'Your criteria sheet:',
     persona.criteria,
+    'Weigh your items in order: item 1 counts more than item 2, and item 2 more than item 3.',
+    'Give up what your Accepts line names before you give up any item.',
+    'Rank an option that has what your Rejects line names below the options that do not.',
   ].join('\n')
 }
 

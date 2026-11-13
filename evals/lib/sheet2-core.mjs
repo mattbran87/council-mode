@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { H } from './helpers.mjs'
-import { mean } from './persona-core.mjs'
+import { mean, identityBefore } from './persona-core.mjs'
 import { sheetMeasures, summarizeSheets, differences, BARS } from './sheet-core.mjs'
 
 export const SHEETS2_VOTERS_PATH = fileURLToPath(new URL('../sheet-voters-5lang-v2.json', import.meta.url))
@@ -29,7 +29,7 @@ export function sheet2Text(version, voter) {
 }
 
 export function sheet2Identity(version, voter) {
-  const id = H.voterIdentity({ name: voter.name, criteria: sheet2Text(version, voter) })
+  const id = identityBefore({ name: voter.name, criteria: sheet2Text(version, voter) })
   return PRIORITIZED.has(version) ? [id, ...PRIORITY_LINES].join('\n') : id
 }
 

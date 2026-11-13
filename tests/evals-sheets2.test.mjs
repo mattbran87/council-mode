@@ -54,7 +54,7 @@ test('runVoterTest sends the schema voteSchema picks for each version, and BALLO
   assert.deepEqual(seen, ['a| false', 'b| false'])
 })
 
-import { parseCriteria } from '../evals/lib/persona-core.mjs'
+import { parseCriteria, identityBefore } from '../evals/lib/persona-core.mjs'
 
 const V2_PATH = new URL('../evals/sheet-voters-5lang-v2.json', import.meta.url)
 const PROD_PATH = new URL('../evals/persona-voters-5lang.json', import.meta.url)
@@ -88,8 +88,17 @@ test('V0 is the production sheet and prompt, word for word', () => {
   assert.deepEqual(SHEET2_VERSIONS, ['V0', 'V1', 'V2', 'V3', 'V4'])
   v2.voters.forEach((v, i) => assert.equal(sheet2Text('V0', v), prod.voters[i].criteria, v.name))
   const p = prod.voters.find(v => v.name === 'Release engineer')
-  assert.equal(prompt('V0'), H.votePrompt(p, 'DOSSIER', order))
+  assert.equal(prompt('V0'), H.votePrompt(p, 'DOSSIER', order, identityBefore(p)))
   assert.throws(() => sheet2Text('V9', rel))
+})
+
+test('production now uses the tested V2 identity, and the finished tests keep the identity they ran with', () => {
+  v2.voters.forEach((v, i) => {
+    const p = prod.voters[i]
+    assert.equal(H.voterIdentity(p), sheet2Identity('V2', v), v.name)
+    assert.equal(identityBefore(p), sheet2Identity('V0', v), v.name)
+  })
+  assert.equal(identityBefore({ name: 'N', criteria: 'C' }), 'You are a voter on a decision panel. Your persona: N.\nYour criteria sheet:\nC')
 })
 
 test('V1 shows a serves and a fails line under each numbered item', () => {

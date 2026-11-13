@@ -149,11 +149,11 @@ test('replyPrompt cannot be forged by challenge text containing a newline', () =
   assert.ok(!p.split('\n').some(l => l.startsWith('CH9')))
 })
 
-test('votePrompt output is unchanged for a persona with name and criteria', async () => {
+test('votePrompt output is pinned for a persona with name and criteria, with the priority lines', async () => {
   const { loadHelpers } = await import('./harness.mjs')
   const { votePrompt } = loadHelpers('votePrompt')
   const p = { name: 'Maintainer', criteria: 'Cares about (in order): readability, tests\nAccepts: slower runtime\nRejects: specialists' }
-  const expected = "You are a voter on a decision panel. Your persona: Maintainer.\nYour criteria sheet:\nCares about (in order): readability, tests\nAccepts: slower runtime\nRejects: specialists\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\nDOSSIER\n\nBallot rules:\n- ranking: every option label, best first. Labels: M, K.\n- reasons: one entry for each adjacent pair in your ranking (higher over lower). cites: the dossier IDs the reason rests on, such as claim IDs (K-C1), weakness IDs (K-W1), rulings (R1), concessions (X1), or unanswered challenges (U1). A reason that cites no dossier ID voids your ballot.\n- flipCondition: \"my ranking changes if ...\".\n- unacceptable: labels of options you would reject outright, or an empty list.\n- hybrid: a combination of options you would prefer, or an empty string."
+  const expected = "You are a voter on a decision panel. Your persona: Maintainer.\nYour criteria sheet:\nCares about (in order): readability, tests\nAccepts: slower runtime\nRejects: specialists\nWeigh your items in order: item 1 counts more than item 2, and item 2 more than item 3.\nGive up what your Accepts line names before you give up any item.\nRank an option that has what your Rejects line names below the options that do not.\n\nRank every option by your criteria, using only the dossier below. The debate authors are hidden.\n\nDOSSIER\n\nBallot rules:\n- ranking: every option label, best first. Labels: M, K.\n- reasons: one entry for each adjacent pair in your ranking (higher over lower). cites: the dossier IDs the reason rests on, such as claim IDs (K-C1), weakness IDs (K-W1), rulings (R1), concessions (X1), or unanswered challenges (U1). A reason that cites no dossier ID voids your ballot.\n- flipCondition: \"my ranking changes if ...\".\n- unacceptable: labels of options you would reject outright, or an empty list.\n- hybrid: a combination of options you would prefer, or an empty string."
   assert.equal(votePrompt(p, 'DOSSIER', ['M', 'K']), expected)
 })
 
@@ -161,7 +161,7 @@ test('votePrompt takes a replacement identity block', async () => {
   const { loadHelpers } = await import('./harness.mjs')
   const { votePrompt, voterIdentity } = loadHelpers('votePrompt', 'voterIdentity')
   const p = { name: 'Maintainer', criteria: 'Cares about (in order): readability' }
-  assert.equal(voterIdentity(p), 'You are a voter on a decision panel. Your persona: Maintainer.\nYour criteria sheet:\nCares about (in order): readability')
+  assert.equal(voterIdentity(p), 'You are a voter on a decision panel. Your persona: Maintainer.\nYour criteria sheet:\nCares about (in order): readability\nWeigh your items in order: item 1 counts more than item 2, and item 2 more than item 3.\nGive up what your Accepts line names before you give up any item.\nRank an option that has what your Rejects line names below the options that do not.')
   const out = votePrompt(p, 'DOSSIER', ['M', 'K'], 'IDENTITY')
   assert.ok(out.startsWith('IDENTITY\n\nRank every option'))
   assert.ok(!out.includes('Maintainer'))
