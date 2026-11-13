@@ -155,3 +155,25 @@ test('a V3 ballot with an assessment passes normalizeBallot and validateBallot',
   assert.equal(H.validateBallot(ballot, labels, ids).valid, true)
   assert.equal(ballot.assessment.length, 3)
 })
+
+import { judgePrompt } from '../evals/lib/persona-core.mjs'
+import { judge2Prompt } from '../evals/lib/sheet2-core.mjs'
+
+test('the judge prompt holds the definitions, keeps the production rules, and names no version or voter', () => {
+  const ballot = { ranking: ['A', 'B'], reasons: [{ higher: 'A', lower: 'B', reason: 'smaller binary' }] }
+  const options = [{ label: 'A', description: 'Go' }, { label: 'B', description: 'Python' }]
+  const p = judge2Prompt(rel, ballot, options)
+  assert.ok(p.includes([
+    'cares1: reproducible builds for 3 OSes from one CI',
+    '  serves it: One CI pipeline builds all 3 OS binaries from the same source.',
+    '  fails it: A release needs a separate machine or manual steps per OS.',
+  ].join('\n')))
+  assert.ok(p.includes('cares3: small artifacts'))
+  assert.ok(p.includes('accepts: longer CI builds\nrejects: per-OS build machines kept by hand'))
+  // The same frame and rules as the production judge prompt.
+  const old = judgePrompt({ criteria: sheet2Text('V0', rel) }, ballot, options)
+  assert.equal(p.split('\nThe options:')[1], old.split('\nThe options:')[1])
+  assert.equal(p.split('\n')[0], old.split('\n')[0])
+  assert.ok(!/\bV[0-4]\b/.test(p))
+  for (const v of v2.voters) assert.ok(!p.includes(v.name), v.name)
+})

@@ -55,3 +55,27 @@ export const BALLOT2_SCHEMA = {
 }
 
 export const voteSchema2 = version => (ASSESSED.has(version) ? BALLOT2_SCHEMA : H.BALLOT_SCHEMA)
+
+// The production judge prompt's frame and rules, with each item's serves and fails lines.
+// Every version is judged against this one reference, and the judge never sees the version or the voter's name.
+export function judge2Prompt(voter, ballot, options) {
+  return [
+    "You check whether a voter's ballot follows the voter's own criteria. Judge only the fit between the reasons and the criteria, not whether the ranking is right.",
+    '',
+    "The voter's criteria, most important first, each with what serves it and what fails it:",
+    ...voter.cares.flatMap((c, i) => [`cares${i + 1}: ${c.item}`, `  serves it: ${c.serves}`, `  fails it: ${c.fails}`]),
+    `accepts: ${voter.accepts}`,
+    `rejects: ${voter.rejects}`,
+    '',
+    'The options:',
+    ...options.map(o => `${o.label}: ${o.description}`),
+    '',
+    `The ballot's ranking, best first: ${ballot.ranking.join(', ')}`,
+    "The ballot's reasons, one per adjacent pair:",
+    ...ballot.reasons.map((r, i) => `${i}. ${r.higher} over ${r.lower}: ${r.reason}`),
+    '',
+    'Rules:',
+    '- reasons: one entry per reason, by its number. serves: the one criterion the reason mainly argues from (cares1, cares2, …, accepts, or rejects), or none if it argues from something the criteria do not mention. note: a few words on why.',
+    '- rejectsViolations: each adjacent pair where the higher option has what the rejects line rules out and the lower option does not. An empty list if there are none.',
+  ].join('\n')
+}
