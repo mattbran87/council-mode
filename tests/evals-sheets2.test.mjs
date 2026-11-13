@@ -75,3 +75,83 @@ test('the v2 voters match the production voters, with a serves and a fails line 
     for (const x of v.cares) assert.ok(x.serves.trim() && x.fails.trim(), `${v.name}: ${x.item}`)
   })
 })
+
+import { SHEET2_VERSIONS, SHEETS2_VOTERS_PATH, PRIORITY_LINES, ASSESSMENT_RULE, sheet2Text, sheet2Identity, sheet2VotePrompt, BALLOT2_SCHEMA, voteSchema2 } from '../evals/lib/sheet2-core.mjs'
+
+const v2 = loadVoters(SHEETS2_VOTERS_PATH)
+const prod = loadVoters(PROD_PATH)
+const rel = v2.voters.find(v => v.name === 'Release engineer')
+const order = ['A', 'B', 'C']
+const prompt = version => sheet2VotePrompt(version, rel, 'DOSSIER', order)
+
+test('V0 is the production sheet and prompt, word for word', () => {
+  assert.deepEqual(SHEET2_VERSIONS, ['V0', 'V1', 'V2', 'V3', 'V4'])
+  v2.voters.forEach((v, i) => assert.equal(sheet2Text('V0', v), prod.voters[i].criteria, v.name))
+  const p = prod.voters.find(v => v.name === 'Release engineer')
+  assert.equal(prompt('V0'), H.votePrompt(p, 'DOSSIER', order))
+  assert.throws(() => sheet2Text('V9', rel))
+})
+
+test('V1 shows a serves and a fails line under each numbered item', () => {
+  assert.equal(sheet2Text('V1', rel), [
+    'Cares about (in order):',
+    '1. reproducible builds for 3 OSes from one CI',
+    '   Serves it: One CI pipeline builds all 3 OS binaries from the same source.',
+    '   Fails it: A release needs a separate machine or manual steps per OS.',
+    '2. code signing on macOS and Windows',
+    '   Serves it: CI signs and notarizes the artifacts with standard tools.',
+    '   Fails it: Signing needs manual steps, or the artifacts are hard to sign.',
+    '3. small artifacts',
+    '   Serves it: Each release download is a few megabytes.',
+    '   Fails it: Each release ships a bundled runtime or a large download.',
+    'Accepts: longer CI builds',
+    'Rejects: per-OS build machines kept by hand',
+  ].join('\n'))
+  assert.equal(sheet2Text('V4', rel), sheet2Text('V1', rel))
+  for (const v of ['V0', 'V2', 'V3']) assert.equal(sheet2Text(v, rel), sheet2Text('V0', rel))
+})
+
+test('V2 adds the 3 priority lines after the sheet, inside the identity block', () => {
+  assert.deepEqual(PRIORITY_LINES, [
+    'Weigh your items in order: item 1 counts more than item 2, and item 2 more than item 3.',
+    'Give up what your Accepts line names before you give up any item.',
+    'Rank an option that has what your Rejects line names below the options that do not.',
+  ])
+  assert.equal(sheet2Identity('V2', rel), [sheet2Identity('V0', rel), ...PRIORITY_LINES].join('\n'))
+  assert.equal(sheet2Identity('V4', rel), [sheet2Identity('V1', rel), ...PRIORITY_LINES].join('\n'))
+  for (const v of ['V0', 'V1', 'V3']) assert.ok(!sheet2Identity(v, rel).includes(PRIORITY_LINES[0]), v)
+})
+
+test('V3 adds the assessment rule as the first ballot rule, and nothing else', () => {
+  assert.equal(ASSESSMENT_RULE, '- assessment: write this first. For each option, one note on how it serves or fails your items, citing dossier IDs. Then rank.')
+  assert.ok(prompt('V3').includes(`Ballot rules:\n${ASSESSMENT_RULE}\n- ranking: `))
+  assert.equal(prompt('V3').replace(`${ASSESSMENT_RULE}\n`, ''), prompt('V0'))
+  assert.ok(!prompt('V0').includes('assessment'))
+})
+
+test('only the identity block and the ballot rules differ between versions', () => {
+  const strip = (version, p) => p.replace(sheet2Identity(version, rel), 'ID').replace(`${ASSESSMENT_RULE}\n`, '')
+  for (const v of SHEET2_VERSIONS) assert.equal(strip(v, prompt(v)), strip('V0', prompt('V0')), v)
+})
+
+test('the extended schema lists assessment first and keeps every production field', () => {
+  assert.deepEqual(Object.keys(BALLOT2_SCHEMA.properties), ['assessment', ...Object.keys(H.BALLOT_SCHEMA.properties)])
+  for (const k of Object.keys(H.BALLOT_SCHEMA.properties)) assert.equal(JSON.stringify(BALLOT2_SCHEMA.properties[k]), JSON.stringify(H.BALLOT_SCHEMA.properties[k]), k)
+  assert.deepEqual(BALLOT2_SCHEMA.required, ['assessment', ...H.BALLOT_SCHEMA.required])
+  assert.equal(voteSchema2('V3'), BALLOT2_SCHEMA)
+  assert.equal(voteSchema2('V4'), BALLOT2_SCHEMA)
+  for (const v of ['V0', 'V1', 'V2']) assert.equal(voteSchema2(v), H.BALLOT_SCHEMA, v)
+})
+
+test('a V3 ballot with an assessment passes normalizeBallot and validateBallot', () => {
+  const labels = ['A', 'B', 'C']
+  const ids = new Set(['A-C1'])
+  const raw = {
+    assessment: labels.map(option => ({ option, note: 'n A-C1' })),
+    ranking: labels, reasons: [{ higher: 'A', lower: 'B', reason: 'r', cites: ['A-C1'] }, { higher: 'B', lower: 'C', reason: 'r', cites: ['A-C1'] }],
+    flipCondition: 'x', unacceptable: [], hybrid: '',
+  }
+  const ballot = H.normalizeBallot(raw, labels, ids)
+  assert.equal(H.validateBallot(ballot, labels, ids).valid, true)
+  assert.equal(ballot.assessment.length, 3)
+})
